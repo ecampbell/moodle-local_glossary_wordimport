@@ -18,7 +18,7 @@
  * Import Word file language strings.
  *
  * @package    local_glossary_wordimport
- * @copyright  2016 Eoin Campbell
+ * @copyright  2020 Eoin Campbell
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -26,11 +26,12 @@ defined('MOODLE_INTERNAL') || die();
 
 
 $string['cannotopentempfile'] = 'Cannot open temporary file <b>{$a}</b>';
-$string['exportglossary'] = 'Export to Microsoft Word';
-$string['importglossary'] = 'Import from Microsoft Word';
+$string['exportglossary'] = 'Export glossary to Microsoft Word file';
+$string['filetoimport'] = 'Browse for and select the Microsoft Word file on your computer which contains the entries to import.';
+$string['importglossary'] = 'Import glossary entries from Microsoft Word file';
 $string['noglossary'] = 'No glossary found, so unable to export to Microsoft Word.';
-$string['pluginname'] = 'Microsoft Word file Import/Export';
-$string['privacy:metadata']      = 'The Microsoft Word file import/export tool for glossarys does not store personal data.';
+$string['pluginname'] = 'Microsoft Word file Import/Export (Glossary)';
+$string['privacy:metadata']      = 'The Microsoft Word file import/export tool for glossaries does not store personal data.';
 $string['replaceglossary'] = 'Replace glossary';
 $string['replaceglossary_help'] = 'Delete the current content of glossary before importing';
 // Strings used in settings.

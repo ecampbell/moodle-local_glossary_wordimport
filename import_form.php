@@ -30,40 +30,40 @@ defined('MOODLE_INTERNAL') || die;
 require_once($CFG->libdir . DIRECTORY_SEPARATOR . 'formslib.php');
 
 /**
- * Importer for Microsoft Word glossarys.
+ * Importer for Microsoft Word glossaries.
  *
- * @copyright 2016 Eoin Campbell
+ * @copyright 2020 Eoin Campbell
  * @author Eoin Campbell
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later (5)
  */
 class local_glossary_wordimport_form extends moodleform {
 
     /**
-     * Define Word import form
+     * Define Microsoft Word file import form
      *
      * @return void
      */
-    public function definition() {
-        $mform = $this->_form;
-        $data  = $this->_customdata;
+
+    function definition() {
+        global $CFG;
+        $mform =& $this->_form;
+        $cmid = $this->_customdata['id'];
 
         $mform->addElement('header', 'general', get_string('importglossary', 'local_glossary_wordimport'));
 
-        // Word files are automatically split into glossary based on Heading 1 styles.
-
-        // User can select 1 and only 1 Word file which must have a .docx suffix (not .docm or .doc).
-        $mform->addElement('filepicker', 'importfile', get_string('wordfile', 'local_glossary_wordimport'), null,
-                           array('subdirs' => 0, 'accepted_types' => array('.docx')));
-        $mform->addHelpButton('importfile', 'wordfile', 'local_glossary_wordimport');
-        $mform->addRule('importfile', null, 'required');
-
+        $mform->addElement('filepicker', 'file', get_string('filetoimport', 'glossary'));
+        $mform->addHelpButton('file', 'filetoimport', 'local_glossary_wordimport');
+        $options = array();
+        $options['current'] = get_string('currentglossary', 'glossary');
+        $options['newglossary'] = get_string('newglossary', 'glossary');
+        $mform->addElement('select', 'dest', get_string('destination', 'glossary'), $options);
+        $mform->addHelpButton('dest', 'destination', 'glossary');
+        $mform->addElement('checkbox', 'catsincl', get_string('importcategories', 'glossary'));
         $mform->addElement('hidden', 'id');
         $mform->setType('id', PARAM_INT);
-
         $this->add_action_buttons(true, get_string('import'));
-
-        $this->set_data($data);
     }
+}
 
     /**
      * Define Word import form validation

@@ -18,7 +18,7 @@
  * Definition of the library class for the Microsoft Word (.docx) file conversion plugin.
  *
  * @package   local_glossary_wordimport
- * @copyright 2019 Eoin Campbell
+ * @copyright 2020 Eoin Campbell
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -31,6 +31,39 @@ require_once($CFG->libdir . '/xmlize.php');
 /**
  * General definitions
  */
+
+function local_glossary_wordimportnavigation_course($navigation, $course, $context) {
+    global $PAGE;
+
+    if (empty($PAGE->cm) && $PAGE->cm->modname !== 'glossary') {
+        return;
+    }
+
+    $params = $PAGE->url->params();
+    if (empty($params['id']) and empty($params['cmid'])) {
+        return;
+    }
+
+    if (empty($PAGE->cm->context)) {
+        $PAGE->cm->context = get_context_module::instance($PAGE->cm->instance);
+    }
+
+    if (!(has_capability('mod/glossary:manageentries', $PAGE->cm->context) and
+        has_capability('mod/glossary:import', $PAGE->cm->context))) {
+        return;
+    }
+
+    // Configure Import link, and pass in the current glossary in case the insert should happen here rather than at the end.
+    $url1 = new moodle_url('/local/glossary_wordimport/index.php',
+            array('id' => $PAGE->cm->id, 'action' => 'import'));
+    $node->add(get_string('importglossary', 'local_glossary_wordimport'), $url1, navigation_node::TYPE_SETTING, null, null,
+            new pix_icon('f/document', '', 'moodle', array('class' => 'iconsmall', 'title' => '')));
+
+    // Configure Export links for current glossary.
+    $url2 = new moodle_url('/local/glossary_wordimport/index.php', array('id' => $PAGE->cm->id, 'action' => 'export'));
+    $node->add(get_string('exportglossary', 'local_glossary_wordimport'), $url2, navigation_node::TYPE_SETTING,
+            null, null, new pix_icon('f/document', '', 'moodle', array('class' => 'iconsmall', 'title' => '')));
+}
 
 
 /**
