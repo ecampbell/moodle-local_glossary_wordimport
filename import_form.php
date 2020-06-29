@@ -51,6 +51,7 @@ class local_glossary_wordimport_form extends moodleform {
 
         $mform->addElement('filepicker', 'file', get_string('filetoimport', 'glossary'));
         $mform->addHelpButton('file', 'filetoimport', 'local_glossary_wordimport');
+        $mform->addRule('file', null, 'required', null, 'client');
         $options = array();
         $options['current'] = get_string('currentglossary', 'glossary');
         $options['newglossary'] = get_string('newglossary', 'glossary');
@@ -77,10 +78,14 @@ class local_glossary_wordimport_form extends moodleform {
             return $errors;
         }
 
+        if (empty($data['file'])) {
+            $errors['file'] = get_string('uploadcsvfilerequired', 'tool_uploadblocksettings');
+        }
+
         $usercontext = context_user::instance($USER->id);
         $fs = get_file_storage();
 
-        if (!$files = $fs->get_area_files($usercontext->id, 'user', 'draft', $data['importfile'], 'id', false)) {
+        if (!$files = $fs->get_area_files($usercontext->id, 'user', 'draft', $data['file'], 'id', false)) {
             $errors['importfile'] = get_string('required');
             return $errors;
         } else {

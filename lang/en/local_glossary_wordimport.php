@@ -27,17 +27,13 @@ defined('MOODLE_INTERNAL') || die();
 
 $string['cannotopentempfile'] = 'Cannot open temporary file <b>{$a}</b>';
 $string['filetoimport'] = 'File to import.';
-$string['filetoimport_help'] = 'Browse for and select the Microsoft Word file on your computer which contains the entries to import.';
+$string['filetoimport_help'] = 'Upload <i>.docx</i> file saved from Microsoft Word or LibreOffice';
 $string['pluginname'] = 'Microsoft Word file Import/Export (Glossary)';
 $string['privacy:metadata']      = 'The Microsoft Word file import/export tool for glossaries does not store personal data.';
 $string['replaceglossary'] = 'Replace glossary';
 $string['replaceglossary_help'] = 'Delete the current content of glossary before importing';
-// Strings used in settings.
-$string['settings'] = 'Word file import settings';
 $string['stylesheetunavailable'] = 'XSLT Stylesheet <b>{$a}</b> is not available';
 $string['transformationfailed'] = 'XSLT transformation failed (<b>{$a}</b>)';
-$string['wordfile'] = 'Microsoft Word file';
-$string['wordfile_help'] = 'Upload <i>.docx</i> file saved from Microsoft Word or LibreOffice';
 $string['wordexport'] = 'Export to Microsoft Word file';
 $string['wordimport'] = 'Import from Microsoft Word file';
 $string['xsltunavailable'] = 'You need the XSLT library installed in PHP to save this Word file';
