@@ -22,9 +22,9 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-require(dirname(__FILE__).'/../../../../config.php');
-require_once(dirname(__FILE__).'/locallib.php');
-require_once(dirname(__FILE__).'/import_form.php');
+require(__DIR__.'/../../config.php');
+require_once(__DIR__.'/locallib.php');
+require_once(__DIR__.'/import_form.php');
 
 $id        = required_param('id', PARAM_INT);           // Course Module ID.
 $chapterid = optional_param('glossaryid', 0, PARAM_INT); // Chapter ID.
@@ -43,10 +43,10 @@ require_capability('mod/glossary:manageentries', $context);
 require_capability('mod/glossary:import', $context);
 
 // Set up page in case an import has been requested.
-$PAGE->set_url('/local/glossary_wordimport/index.php', array('id' => $id, 'chapterid' => $chapterid));
+$PAGE->set_url('/local/glossary_wordimport/index.php', array('id' => $id, 'action' => $action));
 $PAGE->set_title($glossary->name);
 $PAGE->set_heading($course->fullname);
-$mform = new local_glossary_wordimport_form(null, array('id' => $id, 'chapterid' => $chapterid));
+$mform = new local_glossary_wordimport_form(null, array('id' => $id, 'action' => $action));
 
 // If data submitted, then process and store.
 if ($mform->is_cancelled()) {

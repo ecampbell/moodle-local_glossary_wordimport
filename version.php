@@ -15,7 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Import Microsoft Word file into book version information
+ * Import Microsoft Word file into glossary version information
  *
  * @package    local_glossary_wordimport
  * @copyright  2020 Eoin Campbell
@@ -24,8 +24,8 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2020062803;              // The current plugin version (Date: YYYYMMDDXX).
+$plugin->version   = 2020062902;              // The current plugin version (Date: YYYYMMDDXX).
 $plugin->requires = 2016052300;               // Requires Moodle 3.1 or higher.
 $plugin->component = 'local_glossary_wordimport';   // Full name of the plugin (used for diagnostics).
 $plugin->maturity = MATURITY_ALPHA;
-$plugin->release = '0.0.3 (Build: 2020062803)'; // Human readable version information.
+$plugin->release = '0.0.5 (Build: 2020062902)'; // Human readable version information.

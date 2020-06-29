@@ -44,12 +44,10 @@ class local_glossary_wordimport_form extends moodleform {
      * @return void
      */
 
-    function definition() {
-        global $CFG;
+    public function definition() {
         $mform =& $this->_form;
-        $cmid = $this->_customdata['id'];
 
-        $mform->addElement('header', 'general', get_string('importglossary', 'local_glossary_wordimport'));
+        $mform->addElement('header', 'general', get_string('wordimport', 'local_glossary_wordimport'));
 
         $mform->addElement('filepicker', 'file', get_string('filetoimport', 'glossary'));
         $mform->addHelpButton('file', 'filetoimport', 'local_glossary_wordimport');
@@ -63,7 +61,6 @@ class local_glossary_wordimport_form extends moodleform {
         $mform->setType('id', PARAM_INT);
         $this->add_action_buttons(true, get_string('import'));
     }
-}
 
     /**
      * Define Word import form validation
@@ -72,6 +69,7 @@ class local_glossary_wordimport_form extends moodleform {
      * @param array $files
      * @return array
      */
+
     public function validation($data, $files) {
         global $USER;
 
