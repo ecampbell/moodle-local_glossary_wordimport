@@ -26,21 +26,25 @@ require(__DIR__.'/../../config.php');
 require_once(__DIR__.'/locallib.php');
 require_once(__DIR__.'/import_form.php');
 
-$id        = required_param('id', PARAM_INT);           // Course Module ID.
-$chapterid = optional_param('glossaryid', 0, PARAM_INT); // Chapter ID.
+$cmid        = required_param('id', PARAM_INT);           // Course Module ID.
 $action    = optional_param('action', 'import', PARAM_TEXT);  // Import or export.
+$cat = optional_param('cat',0, PARAM_ALPHANUM); // Include categories.
 
 // Security checks.
-$cm = get_coursemodule_from_id('glossary', $id, 0, false, MUST_EXIST);
+$cm = get_coursemodule_from_id('glossary', $cmid, 0, false, MUST_EXIST);
 $course = $DB->get_record('course', array('id' => $cm->course), '*', MUST_EXIST);
 $glossary = $DB->get_record('glossary', array('id' => $cm->instance), '*', MUST_EXIST);
 
 require_course_login($course, true, $cm);
 
-// Should update capabilities to separate import and export permissions.
-$context = context_module::instance($cm->id);
+// Check import/export capabilities.
+$context = context_module::instance($cmid);
 require_capability('mod/glossary:manageentries', $context);
-require_capability('mod/glossary:import', $context);
+if ($action == 'import') {
+    require_capability('mod/glossary:import', $context);
+} else {
+    require_capability('mod/glossary:export', $context);
+}
 
 // Set up page in case an import has been requested.
 $PAGE->set_url('/local/glossary_wordimport/index.php', array('id' => $id, 'action' => $action));
@@ -51,41 +55,15 @@ $mform = new local_glossary_wordimport_form(null, array('id' => $id, 'action' =>
 // If data submitted, then process and store.
 if ($mform->is_cancelled()) {
     // Form cancelled, go back.
-    if (empty($chapter->id)) {
+    if (empty($glossary->id)) {
         redirect($CFG->wwwroot."/mod/glossary/view.php?id=$cm->id");
-    } else {
-        redirect($CFG->wwwroot."/mod/glossary/view.php?id=$cm->id&chapterid=$chapter->id");
     }
-} else if ($action == 'export' and $chapterid) {
-    // Export the current chapter into Word.
-    $chapter = $DB->get_record('glossary', array('id' => $chapterid, 'bookid' => $glossary->id), '*', MUST_EXIST);
-    unset($id);
-    unset($chapterid);
-
-    // Include the glossary title at the top of the glossary.
-    $chaptertext = '<p class="MsoTitle">' . $glossary->name . "</p>\n";
-    $chaptertext .= '<div class="chapter">';
-
-    // Check if the chapter title is duplicated inside the content, and include it if not.
-    if (!$chapter->subchapter and !strpos($chapter->content, "<h1")) {
-        $chaptertext .= "<h1>" . $chapter->title . "</h1>\n";
-    } else if ($chapter->subchapter and !strpos($chapter->content, "<h2")) {
-        $chaptertext .= "<h2>" . $chapter->title . "</h2>\n";
-    }
-    $chaptertext .= $chapter->content;
-    // Preprocess the chapter HTML to embed images.
-    $chaptertext .= local_glossary_wordimport_base64_images($context->id, 'chapter', $chapter->id);
-    $chaptertext .= '</div>';
-    // Postprocess the HTML to add a wrapper template and convert embedded images to a table.
-    $chaptertext = local_glossary_wordimport_export($chaptertext);
-    $filename = clean_filename($glossary->name . '_chap' . sprintf("%02d", $chapter->pagenum)).'.doc';
-    send_file($chaptertext, $filename, 10, 0, true, array('filename' => $filename));
-    die;
 } else if ($action == 'export') {
-    // Export the whole book into Word.
-    $allchapters = $DB->get_records('book_chapters', array('bookid' => $glossary->id), 'pagenum');
-    unset($id);
+    // Export the current glossary into a Word file using the glossary name as the name.
+    $filename = clean_filename(strip_tags(format_string($glossary->name)) . '.doc');
+    $content = glossary_generate_export_file($glossary, NULL, $cat);
 
+    send_file($content, $filename, 0, 0, true, true);
     // Read the title and introduction into a string, embedding images.
     $glossarytext = '<p class="MsoTitle">' . $glossary->name . "</p>\n";
     $glossarytext .= '<div class="chapter" id="intro">' . $glossary->intro;

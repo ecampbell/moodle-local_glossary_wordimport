@@ -24,8 +24,8 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2020063007;              // The current plugin version (Date: YYYYMMDDXX).
+$plugin->version   = 2020063008;              // The current plugin version (Date: YYYYMMDDXX).
 $plugin->requires = 2016052300;               // Requires Moodle 3.1 or higher.
 $plugin->component = 'local_glossary_wordimport';   // Full name of the plugin (used for diagnostics).
 $plugin->maturity = MATURITY_ALPHA;
-$plugin->release = '0.0.7 (Build: 2020063007)'; // Human readable version information.
+$plugin->release = '0.0.8 (Build: 2020063008)'; // Human readable version information.

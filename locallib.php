@@ -32,581 +32,485 @@ require_once($CFG->libdir . '/xmlize.php');
 require_once(__DIR__.'/lib.php');
 require_once($CFG->dirroot.'/course/lib.php');
 
+class local_glossary_wordimport_convert {
+    /** @var string export template with Word-compatible CSS style definitions */
+    private $wordfiletemplate = 'wordfiletemplate.html';
+    /** @var string Stylesheet to export Moodle Question XML into XHTML */
+    private $glossxml2wordstylesheet1 = 'glossxml2wordpass1.xsl';
+    /** @var string Stylesheet to export XHTML into Word-compatible XHTML */
+    private $glossxml2wordstylesheet2 = 'glossxml2wordpass2.xsl';
 
-/**
- * Extract the WordProcessingML XML files from the .docx file, and use a sequence of XSLT
- * steps to convert it into XHTML
- *
- * @param string $filename name of file uploaded to file repository as a draft
- * @param int $usercontextid ID of draft file area where images should be stored
- * @param int $draftitemid ID of particular group in draft file area where images should be stored
- * @return string XHTML content extracted from Word file
- */
-function local_glossary_wordimport_convert_to_xhtml($filename, $usercontextid, $draftitemid) {
-    global $CFG, $USER;
+    /** @var string Stylesheet to import XHTML into Word-compatible XHTML */
+    private $word2glossxmlstylesheet1 = 'wordml2xhtmlpass1.xsl';
+    /** @var string Stylesheet to process XHTML during import */
+    private $word2glossxmlstylesheet2 = 'wordml2xhtmlpass2.xsl';
+    /** @var string Stylesheet to import XHTML into question XML */
+    private $word2glossxmlstylesheet3 = 'xhtml2glossxml.xsl';
 
-    $word2xmlstylesheet1 = $CFG->dirroot . '/lib/editor/atto/plugins/wordimport/wordml2xhtmlpass1.xsl'; // WordML to XHTML.
-    $word2xmlstylesheet2 = $CFG->dirroot . '/lib/editor/atto/plugins/wordimport/wordml2xhtmlpass2.xsl'; // Clean up XHTML.
+    /**
+     * Extract the WordProcessingML XML files from the .docx file, and use a sequence of XSLT
+     * steps to convert it into XHTML
+     *
+     * @param string $filename name of file uploaded to file repository as a draft
+     * @param int $usercontextid ID of draft file area where images should be stored
+     * @param int $draftitemid ID of particular group in draft file area where images should be stored
+     * @return string XHTML content extracted from Word file
+     */
+    function export($filename, $usercontextid, $draftitemid) {
+        global $CFG, $USER;
 
-    debugging(__FUNCTION__ . "(filename = \"{$filename}\", context = $usercontextid, itemid = $draftitemid)", DEBUG_WORDIMPORT);
-    // Check that we can unzip the Word .docx file into its component files.
-    $zipres = zip_open($filename);
-    if (!is_resource($zipres)) {
-        // Cannot unzip file.
-        local_glossary_wordimport_debug_unlink($filename);
-        throw new moodle_exception('cannotunzipfile', 'error');
-    }
+        $word2xmlstylesheet1 = $CFG->dirroot . '/lib/editor/atto/plugins/wordimport/wordml2xhtmlpass1.xsl'; // WordML to XHTML.
+        $word2xmlstylesheet2 = $CFG->dirroot . '/lib/editor/atto/plugins/wordimport/wordml2xhtmlpass2.xsl'; // Clean up XHTML.
 
-    // Check that XSLT is installed.
-    if (!class_exists('XSLTProcessor') || !function_exists('xslt_create')) {
-        // PHP extension 'xsl' is required for this action.
-        throw new moodle_exception(get_string('extensionrequired', 'tool_xmldb', 'xsl'));
-    }
+        debugging(__FUNCTION__ . "(filename = \"{$filename}\", context = $usercontextid, itemid = $draftitemid)", DEBUG_WORDIMPORT);
+        // Check that we can unzip the Word .docx file into its component files.
+        $zipres = zip_open($filename);
+        if (!is_resource($zipres)) {
+            // Cannot unzip file.
+            debug_unlink($filename);
+            throw new moodle_exception('cannotunzipfile', 'error');
+        }
 
-    // Uncomment next line to give XSLT as much memory as possible, to enable larger Word files to be imported.
-    // @codingStandardsIgnoreLine raise_memory_limit(MEMORY_HUGE);
+        // Check that XSLT is installed.
+        if (!class_exists('XSLTProcessor') || !function_exists('xslt_create')) {
+            // PHP extension 'xsl' is required for this action.
+            throw new moodle_exception(get_string('extensionrequired', 'tool_xmldb', 'xsl'));
+        }
 
-    if (!file_exists($word2xmlstylesheet1)) {
-        // XSLT stylesheet to transform WordML into XHTML is missing.
-        throw new moodle_exception('filemissing', 'moodle', $word2xmlstylesheet1);
-    }
+        // Uncomment next line to give XSLT as much memory as possible, to enable larger Word files to be imported.
+        // @codingStandardsIgnoreLine raise_memory_limit(MEMORY_HUGE);
 
-    // Set common parameters for all XSLT transformations.
-    $parameters = array (
-        'moodle_language' => current_language(),
-        'moodle_textdirection' => (right_to_left()) ? 'rtl' : 'ltr',
-        'heading1stylelevel' => 2, // Map Heading1 style to h2 element, Heading2 to h3, etc.
-        'pluginname' => 'atto_wordimport', // Save images as files in the draft user area.
-        'debug_flag' => DEBUG_WORDIMPORT
-    );
+        if (!file_exists($word2xmlstylesheet1)) {
+            // XSLT stylesheet to transform WordML into XHTML is missing.
+            throw new moodle_exception('filemissing', 'moodle', $word2xmlstylesheet1);
+        }
 
-    // Pre-XSLT preparation: merge the WordML and image content from the .docx Word file into one large XML file.
-    // Initialise an XML string to use as a wrapper around all the XML files.
-    $xmldeclaration = '<?xml version="1.0" encoding="UTF-8"?>';
-    $wordmldata = $xmldeclaration . "\n<pass1Container>\n";
-    $imagestring = "";
-
-    $fs = get_file_storage();
-    // Prepare filerecord array for creating each new image file.
-    $fileinfo = array(
-        'contextid' => $usercontextid,
-        'component' => 'user',
-        'filearea' => 'draft',
-        'userid' => $USER->id,
-        'itemid' => $draftitemid,
-        'filepath' => '/',
-        'filename' => ''
+        // Set common parameters for all XSLT transformations.
+        $parameters = array (
+            'moodle_language' => current_language(),
+            'moodle_textdirection' => (right_to_left()) ? 'rtl' : 'ltr',
+            'heading1stylelevel' => 2, // Map Heading1 style to h2 element, Heading2 to h3, etc.
+            'pluginname' => 'atto_wordimport', // Save images as files in the draft user area.
+            'debug_flag' => DEBUG_WORDIMPORT
         );
 
-    $zipentry = zip_read($zipres);
-    while ($zipentry) {
-        if (!zip_entry_open($zipres, $zipentry, "r")) {
-            // Can't read the XML file from the Word .docx file.
-            zip_close($zipres);
-            throw new moodle_exception('errorunzippingfiles', 'error');
-        }
+        // Pre-XSLT preparation: merge the WordML and image content from the .docx Word file into one large XML file.
+        // Initialise an XML string to use as a wrapper around all the XML files.
+        $xmldeclaration = '<?xml version="1.0" encoding="UTF-8"?>';
+        $wordmldata = $xmldeclaration . "\n<pass1Container>\n";
+        $imagestring = "";
 
-        $zefilename = zip_entry_name($zipentry);
-        $zefilesize = zip_entry_filesize($zipentry);
+        $fs = get_file_storage();
+        // Prepare filerecord array for creating each new image file.
+        $fileinfo = array(
+            'contextid' => $usercontextid,
+            'component' => 'user',
+            'filearea' => 'draft',
+            'userid' => $USER->id,
+            'itemid' => $draftitemid,
+            'filepath' => '/',
+            'filename' => ''
+            );
 
-        // Insert internal images into the files table.
-        if (strpos($zefilename, "media")) {
-            $imagedata = zip_entry_read($zipentry, $zefilesize);
-            $imagename = basename($zefilename);
-            $imagesuffix = strtolower(substr(strrchr($zefilename, "."), 1));
-            // GIF, PNG, JPG and JPEG handled OK, but bmp and other non-Internet formats are not.
-            if ($imagesuffix == 'gif' or $imagesuffix == 'png' or $imagesuffix == 'jpg' or $imagesuffix == 'jpeg') {
-                // Prepare the file details for storage, ensuring the image name is unique.
-                $imagenameunique = $imagename;
-                $file = $fs->get_file($usercontextid, 'user', 'draft', $draftitemid, '/', $imagenameunique);
-                while ($file) {
-                    $imagenameunique = basename($imagename, '.' . $imagesuffix) . '_' . substr(uniqid(), 8, 4) .
-                        '.' . $imagesuffix;
-                    $file = $fs->get_file($usercontextid, 'user', 'draft', $draftitemid, '/', $imagenameunique);
-                }
-
-                $fileinfo['filename'] = $imagenameunique;
-                $fs->create_file_from_string($fileinfo, $imagedata);
-
-                $imageurl = "$CFG->wwwroot/draftfile.php/$usercontextid/user/draft/$draftitemid/$imagenameunique";
-                // Return all the details of where the file is stored, even though we don't need them at the moment.
-                $imagestring .= "<file filename=\"media/{$imagename}\"";
-                $imagestring .= " contextid=\"{$usercontextid}\" itemid=\"{$draftitemid}\"";
-                $imagestring .= " name=\"{$imagenameunique}\" url=\"{$imageurl}\">{$imageurl}</file>\n";
-            }
-        } else {
-            // Look for required XML files, read and wrap it, remove the XML declaration, and add it to the XML string.
-            // Read and wrap XML files, remove the XML declaration, and add them to the XML string.
-            $xmlfiledata = preg_replace('/<\?xml version="1.0" ([^>]*)>/', "", zip_entry_read($zipentry, $zefilesize));
-            switch ($zefilename) {
-                case "word/document.xml":
-                    $wordmldata .= "<wordmlContainer>" . $xmlfiledata . "</wordmlContainer>\n";
-                    break;
-                case "docProps/core.xml":
-                    $wordmldata .= "<dublinCore>" . $xmlfiledata . "</dublinCore>\n";
-                    break;
-                case "docProps/custom.xml":
-                    $wordmldata .= "<customProps>" . $xmlfiledata . "</customProps>\n";
-                    break;
-                case "word/styles.xml":
-                    $wordmldata .= "<styleMap>" . $xmlfiledata . "</styleMap>\n";
-                    break;
-                case "word/_rels/document.xml.rels":
-                    $wordmldata .= "<documentLinks>" . $xmlfiledata . "</documentLinks>\n";
-                    break;
-                case "word/footnotes.xml":
-                    $wordmldata .= "<footnotesContainer>" . $xmlfiledata . "</footnotesContainer>\n";
-                    break;
-                case "word/_rels/footnotes.xml.rels":
-                    $wordmldata .= "<footnoteLinks>" . $xmlfiledata . "</footnoteLinks>\n";
-                    break;
-                default:
-            }
-        }
-        // Get the next file in the Zip package.
         $zipentry = zip_read($zipres);
-    }  // End while loop.
-    zip_close($zipres);
-
-    // Add images section.
-    $wordmldata .= "<imagesContainer>\n" . $imagestring . "</imagesContainer>\n";
-    // Close the merged XML file.
-    $wordmldata .= "</pass1Container>";
-
-    // Pass 1 - convert WordML into linear XHTML.
-    // Create a temporary file to store the merged WordML XML content to transform.
-    $tempwordmlfilename = $CFG->tempdir . '/' . basename($filename, ".tmp") . ".wml";
-    if ((file_put_contents($tempwordmlfilename, $wordmldata)) === 0) {
-        // Cannot save the file.
-        throw new moodle_exception('cannotsavefile', 'error', $tempwordmlfilename);
-    }
-
-    $xsltproc = xslt_create();
-    if (!($xsltoutput = xslt_process($xsltproc, $tempwordmlfilename, $word2xmlstylesheet1, null, null, $parameters))) {
-        // Transformation failed.
-        local_glossary_wordimport_debug_unlink($tempwordmlfilename);
-        throw new moodle_exception('transformationfailed', 'atto_wordimport', $tempwordmlfilename);
-    }
-    local_glossary_wordimport_debug_unlink($tempwordmlfilename);
-
-    // Write output of Pass 1 to a temporary file, for use in Pass 2.
-    $tempxhtmlfilename = $CFG->tempdir . '/' . basename($filename, ".tmp") . ".if1";
-    $xsltoutput = str_replace('<p xmlns="http://www.w3.org/1999/xhtml"', '<p', $xsltoutput);
-    $xsltoutput = str_replace('<span xmlns="http://www.w3.org/1999/xhtml"', '<span', $xsltoutput);
-    $xsltoutput = str_replace(' xmlns=""', '', $xsltoutput);
-    if ((file_put_contents($tempxhtmlfilename, $xsltoutput )) === 0) {
-        // Cannot save the file.
-        throw new moodle_exception('cannotsavefile', 'error', $tempxhtmlfilename);
-    }
-
-    // Pass 2 - tidy up linear XHTML a bit.
-    if (!($xsltoutput = xslt_process($xsltproc, $tempxhtmlfilename, $word2xmlstylesheet2, null, null, $parameters))) {
-        // Transformation failed.
-        local_glossary_wordimport_debug_unlink($tempxhtmlfilename);
-        throw new moodle_exception('transformationfailed', 'atto_wordimport', $tempxhtmlfilename);
-    }
-    local_glossary_wordimport_debug_unlink($tempxhtmlfilename);
-
-    // Strip out superfluous namespace declarations on paragraph elements, which Moodle 2.7+ on Windows seems to throw in.
-    $xsltoutput = str_replace('<p xmlns="http://www.w3.org/1999/xhtml"', '<p', $xsltoutput);
-    $xsltoutput = str_replace('<span xmlns="http://www.w3.org/1999/xhtml"', '<span', $xsltoutput);
-    $xsltoutput = str_replace(' xmlns=""', '', $xsltoutput);
-    // Remove 'mml:' prefix from child MathML element and attributes for compatibility with MathJax.
-    $xsltoutput = str_replace('<mml:', '<', $xsltoutput);
-    $xsltoutput = str_replace('</mml:', '</', $xsltoutput);
-    $xsltoutput = str_replace(' mathvariant="normal"', '', $xsltoutput);
-    $xsltoutput = str_replace(' xmlns:mml="http://www.w3.org/1998/Math/MathML"', '', $xsltoutput);
-    $xsltoutput = str_replace('<math>', '<math xmlns="http://www.w3.org/1998/Math/MathML">', $xsltoutput);
-
-    // Keep the converted XHTML file for debugging if developer debugging enabled.
-    if (DEBUG_WORDIMPORT == DEBUG_DEVELOPER and debugging(null, DEBUG_DEVELOPER)) {
-        $tempxhtmlfilename = $CFG->tempdir . '/' . basename($filename, ".tmp") . ".xhtml";
-        file_put_contents($tempxhtmlfilename, $xsltoutput);
-    }
-
-    debugging(__FUNCTION__ . "() -> \"" . substr($xsltoutput, 0, 100) . "\"", DEBUG_WORDIMPORT);
-    return $xsltoutput;
-}   // End function local_glossary_wordimport_convert_to_xhtml.
-
-
-/**
- * Get the HTML body from the converted Word file
- *
- * @param string $xhtmlstring complete XHTML text including head element metadata
- * @return string XHTML text inside <body> element
- */
-function local_glossary_wordimport_get_html_body($xhtmlstring) {
-    $matches = null;
-    $noimgxhtmlstring = local_glossary_wordimport_strip_images($xhtmlstring);
-    if (preg_match('/<body[^>]*>(.+)<\/body>/is', $noimgxhtmlstring, $matches)) {
-        return $matches[1];
-    } else {
-        return $noimgxhtmlstring;
-    }
-}
-
-/**
- * Import HTML pages from a Word file
- *
- * @param string $wordfilename Word file
- * @param stdClass $glossary
- * @param context_module $context
- * @param bool $splitonsubheadings
- * @return void
- */
-function local_glossary_wordimport_import_word($wordfilename, $glossary, $context, $splitonsubheadings) {
-    global $CFG;
-    // Convert the Word file content into XHTML and an array of images.
-    $imagesforzipping = array();
-    $htmlcontent = local_glossary_wordimport_convert_to_xhtml($wordfilename, $imagesforzipping);
-
-    // Create a temporary Zip file to store the HTML and images for feeding to import function.
-    $zipfilename = $CFG->tempdir . DIRECTORY_SEPARATOR . basename($wordfilename, ".tmp") . ".zip";
-    $zipfile = new ZipArchive;
-    if (!($zipfile->open($zipfilename, ZipArchive::CREATE))) {
-        // Cannot open zip file.
-        throw new moodle_exception('cannotopenzip', 'error');
-    }
-
-    // Add any images to the Zip file.
-    if (count($imagesforzipping) > 0) {
-        foreach ($imagesforzipping as $imagename => $imagedata) {
-            $zipfile->addFromString($imagename, $imagedata);
-        }
-    }
-
-    // Split the single HTML file into multiple chapters based on h1 elements.
-    $h1matches = null;
-    $chaptermatches = null;
-    // Grab title and contents of each 'Heading 1' section, which is mapped to h3.
-    $chaptermatches = preg_split('#<h3>.*</h3>#isU', $htmlcontent);
-    preg_match_all('#<h3>(.*)</h3>#i', $htmlcontent, $h1matches);
-    // @codingStandardsIgnoreLine debugging(__FUNCTION__ . ":" . __LINE__ . ": n chapters = " . count($chaptermatches), DEBUG_WORDIMPORT);
-
-    // If no h3 elements are present, treat the whole file as a single chapter.
-    if (count($chaptermatches) == 1) {
-        $zipfile->addFromString("index.htm", $htmlcontent);
-    }
-
-    // Create a separate HTML file in the Zip file for each section of content.
-    for ($i = 1; $i < count($chaptermatches); $i++) {
-        // Remove any tags from heading, as it prevents proper import of the chapter title.
-        $chaptitle = strip_tags($h1matches[1][$i - 1]);
-        // @codingStandardsIgnoreLine debugging(__FUNCTION__ . ":" . __LINE__ . ": chaptitle = " . $chaptitle, DEBUG_WORDIMPORT);
-        $chapcontent = $chaptermatches[$i];
-        $chapfilename = sprintf("index%02d.htm", $i);
-
-        // Remove the closing HTML markup from the last section.
-        if ($i == (count($chaptermatches) - 1)) {
-            $chapcontent = substr($chapcontent, 0, strpos($chapcontent, "</div></body>"));
-        }
-
-        if ($splitonsubheadings) {
-            // Save each subsection as a separate HTML file with a '_sub.htm' suffix.
-            $h2matches = null;
-            $subchaptermatches = null;
-            // Grab title and contents of each subsection.
-            preg_match_all('#<h4>(.*)</h4>#i', $chapcontent, $h2matches);
-            $subchaptermatches = preg_split('#<h4>.*</h4>#isU', $chapcontent);
-
-            // First save the initial chapter content.
-            $chapcontent = $subchaptermatches[0];
-            $chapfilename = sprintf("index%02d_00.htm", $i);
-            $htmlfilecontent = "<html><head><title>{$chaptitle}</title></head>" .
-                "<body>{$chapcontent}</body></html>";
-            $zipfile->addFromString($chapfilename, $htmlfilecontent);
-
-            // Save each subsection to a separate file.
-            for ($j = 1; $j < count($subchaptermatches); $j++) {
-                $subchaptitle = strip_tags($h2matches[1][$j - 1]);
-                $subchapcontent = $subchaptermatches[$j];
-                $subsectionfilename = sprintf("index%02d_%02d_sub.htm", $i, $j);
-                $htmlfilecontent = "<html><head><title>{$subchaptitle}</title></head>" .
-                    "<body>{$subchapcontent}</body></html>";
-                $zipfile->addFromString($subsectionfilename, $htmlfilecontent);
+        while ($zipentry) {
+            if (!zip_entry_open($zipres, $zipentry, "r")) {
+                // Can't read the XML file from the Word .docx file.
+                zip_close($zipres);
+                throw new moodle_exception('errorunzippingfiles', 'error');
             }
+
+            $zefilename = zip_entry_name($zipentry);
+            $zefilesize = zip_entry_filesize($zipentry);
+
+            // Insert internal images into the files table.
+            if (strpos($zefilename, "media")) {
+                $imagedata = zip_entry_read($zipentry, $zefilesize);
+                $imagename = basename($zefilename);
+                $imagesuffix = strtolower(substr(strrchr($zefilename, "."), 1));
+                // GIF, PNG, JPG and JPEG handled OK, but bmp and other non-Internet formats are not.
+                if ($imagesuffix == 'gif' or $imagesuffix == 'png' or $imagesuffix == 'jpg' or $imagesuffix == 'jpeg') {
+                    // Prepare the file details for storage, ensuring the image name is unique.
+                    $imagenameunique = $imagename;
+                    $file = $fs->get_file($usercontextid, 'user', 'draft', $draftitemid, '/', $imagenameunique);
+                    while ($file) {
+                        $imagenameunique = basename($imagename, '.' . $imagesuffix) . '_' . substr(uniqid(), 8, 4) .
+                            '.' . $imagesuffix;
+                        $file = $fs->get_file($usercontextid, 'user', 'draft', $draftitemid, '/', $imagenameunique);
+                    }
+
+                    $fileinfo['filename'] = $imagenameunique;
+                    $fs->create_file_from_string($fileinfo, $imagedata);
+
+                    $imageurl = "$CFG->wwwroot/draftfile.php/$usercontextid/user/draft/$draftitemid/$imagenameunique";
+                    // Return all the details of where the file is stored, even though we don't need them at the moment.
+                    $imagestring .= "<file filename=\"media/{$imagename}\"";
+                    $imagestring .= " contextid=\"{$usercontextid}\" itemid=\"{$draftitemid}\"";
+                    $imagestring .= " name=\"{$imagenameunique}\" url=\"{$imageurl}\">{$imageurl}</file>\n";
+                }
+            } else {
+                // Look for required XML files, read and wrap it, remove the XML declaration, and add it to the XML string.
+                // Read and wrap XML files, remove the XML declaration, and add them to the XML string.
+                $xmlfiledata = preg_replace('/<\?xml version="1.0" ([^>]*)>/', "", zip_entry_read($zipentry, $zefilesize));
+                switch ($zefilename) {
+                    case "word/document.xml":
+                        $wordmldata .= "<wordmlContainer>" . $xmlfiledata . "</wordmlContainer>\n";
+                        break;
+                    case "docProps/core.xml":
+                        $wordmldata .= "<dublinCore>" . $xmlfiledata . "</dublinCore>\n";
+                        break;
+                    case "docProps/custom.xml":
+                        $wordmldata .= "<customProps>" . $xmlfiledata . "</customProps>\n";
+                        break;
+                    case "word/styles.xml":
+                        $wordmldata .= "<styleMap>" . $xmlfiledata . "</styleMap>\n";
+                        break;
+                    case "word/_rels/document.xml.rels":
+                        $wordmldata .= "<documentLinks>" . $xmlfiledata . "</documentLinks>\n";
+                        break;
+                    case "word/footnotes.xml":
+                        $wordmldata .= "<footnotesContainer>" . $xmlfiledata . "</footnotesContainer>\n";
+                        break;
+                    case "word/_rels/footnotes.xml.rels":
+                        $wordmldata .= "<footnoteLinks>" . $xmlfiledata . "</footnoteLinks>\n";
+                        break;
+                    default:
+                }
+            }
+            // Get the next file in the Zip package.
+            $zipentry = zip_read($zipres);
+        }  // End while loop.
+        zip_close($zipres);
+
+        // Add images section.
+        $wordmldata .= "<imagesContainer>\n" . $imagestring . "</imagesContainer>\n";
+        // Close the merged XML file.
+        $wordmldata .= "</pass1Container>";
+
+        // Pass 1 - convert WordML into linear XHTML.
+        // Create a temporary file to store the merged WordML XML content to transform.
+        $tempwordmlfilename = $CFG->tempdir . '/' . basename($filename, ".tmp") . ".wml";
+        if ((file_put_contents($tempwordmlfilename, $wordmldata)) === 0) {
+            // Cannot save the file.
+            throw new moodle_exception('cannotsavefile', 'error', $tempwordmlfilename);
+        }
+
+        $xsltproc = xslt_create();
+        if (!($xsltoutput = xslt_process($xsltproc, $tempwordmlfilename, $word2xmlstylesheet1, null, null, $parameters))) {
+            // Transformation failed.
+            debug_unlink($tempwordmlfilename);
+            throw new moodle_exception('transformationfailed', 'atto_wordimport', $tempwordmlfilename);
+        }
+        debug_unlink($tempwordmlfilename);
+
+        // Write output of Pass 1 to a temporary file, for use in Pass 2.
+        $tempxhtmlfilename = $CFG->tempdir . '/' . basename($filename, ".tmp") . ".if1";
+        $xsltoutput = str_replace('<p xmlns="http://www.w3.org/1999/xhtml"', '<p', $xsltoutput);
+        $xsltoutput = str_replace('<span xmlns="http://www.w3.org/1999/xhtml"', '<span', $xsltoutput);
+        $xsltoutput = str_replace(' xmlns=""', '', $xsltoutput);
+        if ((file_put_contents($tempxhtmlfilename, $xsltoutput )) === 0) {
+            // Cannot save the file.
+            throw new moodle_exception('cannotsavefile', 'error', $tempxhtmlfilename);
+        }
+
+        // Pass 2 - tidy up linear XHTML a bit.
+        if (!($xsltoutput = xslt_process($xsltproc, $tempxhtmlfilename, $word2xmlstylesheet2, null, null, $parameters))) {
+            // Transformation failed.
+            debug_unlink($tempxhtmlfilename);
+            throw new moodle_exception('transformationfailed', 'atto_wordimport', $tempxhtmlfilename);
+        }
+        debug_unlink($tempxhtmlfilename);
+
+        // Strip out superfluous namespace declarations on paragraph elements, which Moodle 2.7+ on Windows seems to throw in.
+        $xsltoutput = str_replace('<p xmlns="http://www.w3.org/1999/xhtml"', '<p', $xsltoutput);
+        $xsltoutput = str_replace('<span xmlns="http://www.w3.org/1999/xhtml"', '<span', $xsltoutput);
+        $xsltoutput = str_replace(' xmlns=""', '', $xsltoutput);
+        // Remove 'mml:' prefix from child MathML element and attributes for compatibility with MathJax.
+        $xsltoutput = str_replace('<mml:', '<', $xsltoutput);
+        $xsltoutput = str_replace('</mml:', '</', $xsltoutput);
+        $xsltoutput = str_replace(' mathvariant="normal"', '', $xsltoutput);
+        $xsltoutput = str_replace(' xmlns:mml="http://www.w3.org/1998/Math/MathML"', '', $xsltoutput);
+        $xsltoutput = str_replace('<math>', '<math xmlns="http://www.w3.org/1998/Math/MathML">', $xsltoutput);
+
+        // Keep the converted XHTML file for debugging if developer debugging enabled.
+        if (DEBUG_WORDIMPORT == DEBUG_DEVELOPER and debugging(null, DEBUG_DEVELOPER)) {
+            $tempxhtmlfilename = $CFG->tempdir . '/' . basename($filename, ".tmp") . ".xhtml";
+            file_put_contents($tempxhtmlfilename, $xsltoutput);
+        }
+
+        debugging(__FUNCTION__ . "() -> \"" . substr($xsltoutput, 0, 100) . "\"", DEBUG_WORDIMPORT);
+        return $xsltoutput;
+    }   // End export.
+
+
+    /**
+     * Get the HTML body from the converted Word file
+     *
+     * @param string $xhtmlstring complete XHTML text including head element metadata
+     * @return string XHTML text inside <body> element
+     */
+    get_html_body($xhtmlstring) {
+        $matches = null;
+        $noimgxhtmlstring = strip_images($xhtmlstring);
+        if (preg_match('/<body[^>]*>(.+)<\/body>/is', $noimgxhtmlstring, $matches)) {
+            return $matches[1];
         } else {
-            // Save each section as a HTML file.
-            $htmlfilecontent = "<html><head><title>{$chaptitle}</title></head>" .
-                "<body>{$chapcontent}</body></html>";
-            $zipfile->addFromString($chapfilename, $htmlfilecontent);
+            return $noimgxhtmlstring;
         }
     }
-    $zipfile->close();
 
-    // Add the Zip file to the file storage area.
-    $fs = get_file_storage();
-    $zipfilerecord = array(
-        'contextid' => $context->id,
-        'component' => 'user',
-        'filearea' => 'draft',
-        'itemid' => $glossary->revision,
-        'filepath' => "/",
-        'filename' => basename($zipfilename)
+
+
+
+    /**
+     * Delete previously unzipped Word file
+     *
+     * @param context_module $context
+     */
+    delete_files($context) {
+        $fs = get_file_storage();
+        $fs->delete_area_files($context->id, 'mod_glossary', 'wordimporttemp', 0);
+    }
+
+
+
+
+
+    /**
+     * Export glossary XML into Word-compatible XHTML format
+     *
+     * Use an XSLT script to do the job, as it is much easier to implement this,
+     * and Moodle sites have access to the php XSLT 1.0 processor.
+     *
+     * @param string $content all XML content from a glossary
+     * @return string Word-compatible XHTML text
+     */
+    export($content) {
+        global $CFG, $USER, $COURSE, $OUTPUT;
+
+        /*
+         * @var string export template with Word-compatible CSS style definitions
+        */
+        $wordfiletemplate = 'wordfiletemplate.html';
+        /*
+         * @var string Stylesheet to export XHTML into Word-compatible XHTML
+        */
+        $exportstylesheet = 'xhtml2wordpass2.xsl';
+
+        // @codingStandardsIgnoreLine debugging(__FUNCTION__ . '($content = "' . str_replace("\n", "", substr($content, 80, 500)) . ' ...")', DEBUG_WORDIMPORT);
+
+        // XHTML template for Word file CSS styles formatting.
+        $htmltemplatefilepath = __DIR__ . "/" . $wordfiletemplate;
+        $stylesheet = __DIR__ . "/" . $exportstylesheet;
+
+        // Check that XSLT is installed, and the XSLT stylesheet and XHTML template are present.
+        if (!class_exists('XSLTProcessor') || !function_exists('xslt_create')) {
+            echo $OUTPUT->notification(get_string('xsltunavailable', 'local_glossary_wordimport'));
+            return false;
+        } else if (!file_exists($stylesheet)) {
+            // Stylesheet to transform Moodle Question XML into Word doesn't exist.
+            echo $OUTPUT->notification(get_string('stylesheetunavailable', 'local_glossary_wordimport', $stylesheet));
+            return false;
+        }
+
+        // Get a temporary file name for storing the glossary XHTML content to transform.
+        if (!($tempxmlfilename = tempnam($CFG->tempdir . DIRECTORY_SEPARATOR, "b2w-"))) {
+            echo $OUTPUT->notification(get_string('cannotopentempfile', 'local_glossary_wordimport', basename($tempxmlfilename)));
+            return false;
+        }
+        unlink($tempxmlfilename);
+        $tempxhtmlfilename = $CFG->tempdir . DIRECTORY_SEPARATOR . basename($tempxmlfilename, ".tmp") . ".xhtm";
+
+        // Uncomment next line to give XSLT as much memory as possible, to enable larger Word files to be exported.
+        // @codingStandardsIgnoreLine raise_memory_limit(MEMORY_HUGE);
+
+        $cleancontent = clean_html_text($content);
+
+
+        // Set parameters for XSLT transformation. Note that we cannot use $arguments though.
+        $parameters = array (
+            'course_id' => $COURSE->id,
+            'course_name' => $COURSE->fullname,
+            'author_name' => $USER->firstname . ' ' . $USER->lastname,
+            'moodle_country' => $USER->country,
+            'moodle_language' => current_language(),
+            'moodle_textdirection' => (right_to_left()) ? 'rtl' : 'ltr',
+            'moodle_release' => $CFG->release,
+            'moodle_url' => $CFG->wwwroot . "/",
+            'moodle_username' => $USER->username,
+            'debug_flag' => debugging('', DEBUG_WORDIMPORT),
+            'transformationfailed' => get_string('transformationfailed', 'local_glossary_wordimport', $exportstylesheet)
         );
-    $zipfile = $fs->create_file_from_pathname($zipfilerecord, $zipfilename);
 
-    // Call the standard HTML import function to really import the content.
-    // Argument 2, value 2 = Each HTML file represents 1 chapter.
-    toolbook_importhtml_import_chapters($zipfile, 2, $glossary, $context);
+        // Write the glossary contents and the HTML template to a file.
+        $xhtmloutput = "<container>\n<container><html xmlns='http://www.w3.org/1999/xhtml'><body>" .
+                $cleancontent . "</body></html></container>\n<htmltemplate>\n" .
+                file_get_contents($htmltemplatefilepath) . "\n</htmltemplate>\n</container>";
+        if ((file_put_contents($tempxhtmlfilename, $xhtmloutput)) == 0) {
+            echo $OUTPUT->notification(get_string('cannotwritetotempfile', 'local_glossary_wordimport', basename($tempxhtmlfilename)));
+            return false;
+        }
 
-}
+        // Prepare for Pass 2 XSLT transformation (Pass 1 not needed because books, unlike questions, are already HTML.
+        $stylesheet = __DIR__ . "/" . $exportstylesheet;
+        $xsltproc = xslt_create();
+        if (!($xsltoutput = xslt_process($xsltproc, $tempxhtmlfilename, $stylesheet, null, null, $parameters))) {
+            echo $OUTPUT->notification(get_string('transformationfailed', 'local_glossary_wordimport', $stylesheet));
+            debug_unlink($tempxhtmlfilename);
+            return false;
+        }
+        debug_unlink($tempxhtmlfilename);
 
+        // Strip out any redundant namespace attributes, which XSLT on Windows seems to add.
+        $xsltoutput = str_replace(' xmlns=""', '', $xsltoutput);
+        $xsltoutput = str_replace(' xmlns="http://www.w3.org/1999/xhtml"', '', $xsltoutput);
+        // Unescape double minuses if they were substituted during CDATA content clean-up.
+        $xsltoutput = str_replace("WORDIMPORTMinusMinus", "--", $xsltoutput);
 
-/**
- * Delete previously unzipped Word file
- *
- * @param context_module $context
- */
-function local_glossary_wordimport_delete_files($context) {
-    $fs = get_file_storage();
-    $fs->delete_area_files($context->id, 'mod_glossary', 'wordimporttemp', 0);
-}
+        // Strip off the XML declaration, if present, since Word doesn't like it.
+        if (strncasecmp($xsltoutput, "<?xml ", 5) == 0) {
+            $content = substr($xsltoutput, strpos($xsltoutput, "\n"));
+        } else {
+            $content = $xsltoutput;
+        }
 
+        return $content;
+    }   // End export function.
 
+    /**
+     * Get images and write them as base64 inside the HTML content
+     *
+     * A string containing the HTML with embedded base64 images is returned
+     *
+     * @param string $contextid the context ID
+     * @param string $filearea filearea: chapter or intro
+     * @param string $chapterid the chapter ID (optional)
+     * @return string the modified HTML with embedded images
+     */
+    base64_images($contextid, $filearea, $chapterid = null) {
+        // Get the list of files embedded in the book or chapter.
+        // Note that this will break on images in the Book Intro section.
+        $imagestring = '';
+        $fs = get_file_storage();
+        if ($filearea == 'intro') {
+            $files = $fs->get_area_files($contextid, 'mod_glossary', $filearea);
+        } else {
+            $files = $fs->get_area_files($contextid, 'mod_glossary', $filearea, $chapterid);
+        }
+        foreach ($files as $fileinfo) {
+            // Process image files, converting them into Base64 encoding.
+            debugging(__FUNCTION__ . ": $filearea file: " . $fileinfo->get_filename(), DEBUG_WORDIMPORT);
+            $fileext = strtolower(pathinfo($fileinfo->get_filename(), PATHINFO_EXTENSION));
+            if ($fileext == 'png' or $fileext == 'jpg' or $fileext == 'jpeg' or $fileext == 'gif') {
+                $filename = $fileinfo->get_filename();
+                $filetype = ($fileext == 'jpg') ? 'jpeg' : $fileext;
+                $fileitemid = $fileinfo->get_itemid();
+                $filepath = $fileinfo->get_filepath();
+                $filedata = $fs->get_file($contextid, 'mod_glossary', $filearea, $fileitemid, $filepath, $filename);
 
-
-
-/**
- * Export glossary XML into Word-compatible XHTML format
- *
- * Use an XSLT script to do the job, as it is much easier to implement this,
- * and Moodle sites have access to the php XSLT 1.0 processor.
- *
- * @param string $content all XML content from a glossary
- * @return string Word-compatible XHTML text
- */
-function local_glossary_wordimport_export($content) {
-    global $CFG, $USER, $COURSE, $OUTPUT;
-
-    /*
-     * @var string export template with Word-compatible CSS style definitions
-    */
-    $wordfiletemplate = 'wordfiletemplate.html';
-    /*
-     * @var string Stylesheet to export XHTML into Word-compatible XHTML
-    */
-    $exportstylesheet = 'xhtml2wordpass2.xsl';
-
-    // @codingStandardsIgnoreLine debugging(__FUNCTION__ . '($content = "' . str_replace("\n", "", substr($content, 80, 500)) . ' ...")', DEBUG_WORDIMPORT);
-
-    // XHTML template for Word file CSS styles formatting.
-    $htmltemplatefilepath = __DIR__ . "/" . $wordfiletemplate;
-    $stylesheet = __DIR__ . "/" . $exportstylesheet;
-
-    // Check that XSLT is installed, and the XSLT stylesheet and XHTML template are present.
-    if (!class_exists('XSLTProcessor') || !function_exists('xslt_create')) {
-        echo $OUTPUT->notification(get_string('xsltunavailable', 'local_glossary_wordimport'));
-        return false;
-    } else if (!file_exists($stylesheet)) {
-        // Stylesheet to transform Moodle Question XML into Word doesn't exist.
-        echo $OUTPUT->notification(get_string('stylesheetunavailable', 'local_glossary_wordimport', $stylesheet));
-        return false;
-    }
-
-    // Get a temporary file name for storing the book/chapter XHTML content to transform.
-    if (!($tempxmlfilename = tempnam($CFG->tempdir . DIRECTORY_SEPARATOR, "b2w-"))) {
-        echo $OUTPUT->notification(get_string('cannotopentempfile', 'local_glossary_wordimport', basename($tempxmlfilename)));
-        return false;
-    }
-    unlink($tempxmlfilename);
-    $tempxhtmlfilename = $CFG->tempdir . DIRECTORY_SEPARATOR . basename($tempxmlfilename, ".tmp") . ".xhtm";
-
-    // Uncomment next line to give XSLT as much memory as possible, to enable larger Word files to be exported.
-    // @codingStandardsIgnoreLine raise_memory_limit(MEMORY_HUGE);
-
-    $cleancontent = local_glossary_wordimport_clean_html_text($content);
-
-    // Set the offset for heading styles, default is h3 becomes Heading 1.
-    $heading1styleoffset = '3';
-    if (strpos($cleancontent, '<div class="lucimoo">')) {
-        $heading1styleoffset = '1';
-    }
-
-    // Set parameters for XSLT transformation. Note that we cannot use $arguments though.
-    $parameters = array (
-        'course_id' => $COURSE->id,
-        'course_name' => $COURSE->fullname,
-        'author_name' => $USER->firstname . ' ' . $USER->lastname,
-        'moodle_country' => $USER->country,
-        'moodle_language' => current_language(),
-        'moodle_textdirection' => (right_to_left()) ? 'rtl' : 'ltr',
-        'moodle_release' => $CFG->release,
-        'moodle_url' => $CFG->wwwroot . "/",
-        'moodle_username' => $USER->username,
-        'debug_flag' => debugging('', DEBUG_WORDIMPORT),
-        'heading1stylelevel' => $heading1styleoffset,
-        'transformationfailed' => get_string('transformationfailed', 'local_glossary_wordimport', $exportstylesheet)
-    );
-
-    // Write the book contents and the HTML template to a file.
-    $xhtmloutput = "<container>\n<container><html xmlns='http://www.w3.org/1999/xhtml'><body>" .
-            $cleancontent . "</body></html></container>\n<htmltemplate>\n" .
-            file_get_contents($htmltemplatefilepath) . "\n</htmltemplate>\n</container>";
-    if ((file_put_contents($tempxhtmlfilename, $xhtmloutput)) == 0) {
-        echo $OUTPUT->notification(get_string('cannotwritetotempfile', 'local_glossary_wordimport', basename($tempxhtmlfilename)));
-        return false;
-    }
-
-    // Prepare for Pass 2 XSLT transformation (Pass 1 not needed because books, unlike questions, are already HTML.
-    $stylesheet = __DIR__ . "/" . $exportstylesheet;
-    $xsltproc = xslt_create();
-    if (!($xsltoutput = xslt_process($xsltproc, $tempxhtmlfilename, $stylesheet, null, null, $parameters))) {
-        echo $OUTPUT->notification(get_string('transformationfailed', 'local_glossary_wordimport', $stylesheet));
-        local_glossary_wordimport_debug_unlink($tempxhtmlfilename);
-        return false;
-    }
-    local_glossary_wordimport_debug_unlink($tempxhtmlfilename);
-
-    // Strip out any redundant namespace attributes, which XSLT on Windows seems to add.
-    $xsltoutput = str_replace(' xmlns=""', '', $xsltoutput);
-    $xsltoutput = str_replace(' xmlns="http://www.w3.org/1999/xhtml"', '', $xsltoutput);
-    // Unescape double minuses if they were substituted during CDATA content clean-up.
-    $xsltoutput = str_replace("WORDIMPORTMinusMinus", "--", $xsltoutput);
-
-    // Strip off the XML declaration, if present, since Word doesn't like it.
-    if (strncasecmp($xsltoutput, "<?xml ", 5) == 0) {
-        $content = substr($xsltoutput, strpos($xsltoutput, "\n"));
-    } else {
-        $content = $xsltoutput;
-    }
-
-    return $content;
-}   // End local_glossary_wordimport_export function.
-
-/**
- * Get images and write them as base64 inside the HTML content
- *
- * A string containing the HTML with embedded base64 images is returned
- *
- * @param string $contextid the context ID
- * @param string $filearea filearea: chapter or intro
- * @param string $chapterid the chapter ID (optional)
- * @return string the modified HTML with embedded images
- */
-function local_glossary_wordimport_base64_images($contextid, $filearea, $chapterid = null) {
-    // Get the list of files embedded in the book or chapter.
-    // Note that this will break on images in the Book Intro section.
-    $imagestring = '';
-    $fs = get_file_storage();
-    if ($filearea == 'intro') {
-        $files = $fs->get_area_files($contextid, 'mod_glossary', $filearea);
-    } else {
-        $files = $fs->get_area_files($contextid, 'mod_glossary', $filearea, $chapterid);
-    }
-    foreach ($files as $fileinfo) {
-        // Process image files, converting them into Base64 encoding.
-        debugging(__FUNCTION__ . ": $filearea file: " . $fileinfo->get_filename(), DEBUG_WORDIMPORT);
-        $fileext = strtolower(pathinfo($fileinfo->get_filename(), PATHINFO_EXTENSION));
-        if ($fileext == 'png' or $fileext == 'jpg' or $fileext == 'jpeg' or $fileext == 'gif') {
-            $filename = $fileinfo->get_filename();
-            $filetype = ($fileext == 'jpg') ? 'jpeg' : $fileext;
-            $fileitemid = $fileinfo->get_itemid();
-            $filepath = $fileinfo->get_filepath();
-            $filedata = $fs->get_file($contextid, 'mod_glossary', $filearea, $fileitemid, $filepath, $filename);
-
-            if (!$filedata === false) {
-                $base64data = base64_encode($filedata->get_content());
-                $filedata = 'data:image/' . $filetype . ';base64,' . $base64data;
-                // Embed the image name and data into the HTML.
-                $imagestring .= '<img title="' . $filename . '" src="' . $filedata . '"/>';
+                if (!$filedata === false) {
+                    $base64data = base64_encode($filedata->get_content());
+                    $filedata = 'data:image/' . $filetype . ';base64,' . $base64data;
+                    // Embed the image name and data into the HTML.
+                    $imagestring .= '<img title="' . $filename . '" src="' . $filedata . '"/>';
+                }
             }
         }
-    }
 
-    if ($imagestring != '') {
-        return '<div class="ImageFile">' . $imagestring . '</div>';
-    }
-    return '';
-}
-
-
-/**
- * Clean HTML content
- *
- * A string containing clean XHTML is returned
- *
- * @param string $cdatastring XHTML from inside a CDATA_SECTION in a question text element
- * @return string
- */
-function local_glossary_wordimport_clean_html_text($cdatastring) {
-    // Escape double minuses, which cause XSLT processing to fail.
-    $cdatastring = str_replace("--", "WORDIMPORTMinusMinus", $cdatastring);
-
-    // Wrap the string in a HTML wrapper, load it into a new DOM document as HTML, but save as XML.
-    $doc = new DOMDocument();
-    libxml_use_internal_errors(true);
-    $doc->loadHTML('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><html><body>' . $cdatastring . '</body></html>');
-    $doc->getElementsByTagName('html')->item(0)->setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
-    $xml = $doc->saveXML();
-
-    $bodystart = stripos($xml, '<body>') + strlen('<body>');
-    $bodylength = strripos($xml, '</body>') - $bodystart;
-    if ($bodystart || $bodylength) {
-        $cleanxhtml = substr($xml, $bodystart, $bodylength);
-    } else {
-        $cleanxhtml = $cdatastring;
-    }
-
-    // Fix up filenames after @@PLUGINFILE@@ to replace URL-encoded characters with ordinary characters.
-    $foundpluginfilenames = preg_match_all('~(.*?)<img src="@@PLUGINFILE@@/([^"]*)(.*)~s', $cleanxhtml,
-                                $pluginfilematches, PREG_SET_ORDER);
-    $nummatches = count($pluginfilematches);
-    if ($foundpluginfilenames and $foundpluginfilenames != 0) {
-        $urldecodedstring = "";
-        // Process the possibly-URL-escaped filename so that it matches the name in the file element.
-        for ($i = 0; $i < $nummatches; $i++) {
-            // Decode the filename and add the surrounding text.
-            $decodedfilename = urldecode($pluginfilematches[$i][2]);
-            $urldecodedstring .= $pluginfilematches[$i][1] . '<img src="@@PLUGINFILE@@/' . $decodedfilename .
-                                    $pluginfilematches[$i][3];
+        if ($imagestring != '') {
+            return '<div class="ImageFile">' . $imagestring . '</div>';
         }
-        $cleanxhtml = $urldecodedstring;
+        return '';
     }
 
-    // Strip soft hyphens (0xAD, or decimal 173).
-    $cleanxhtml = preg_replace('/\xad/u', '', $cleanxhtml);
 
-    return $cleanxhtml;
-}
+    /**
+     * Clean HTML content
+     *
+     * A string containing clean XHTML is returned
+     *
+     * @param string $cdatastring XHTML from inside a CDATA_SECTION in a question text element
+     * @return string
+     */
+    clean_html_text($cdatastring) {
+        // Escape double minuses, which cause XSLT processing to fail.
+        $cdatastring = str_replace("--", "WORDIMPORTMinusMinus", $cdatastring);
 
+        // Wrap the string in a HTML wrapper, load it into a new DOM document as HTML, but save as XML.
+        $doc = new DOMDocument();
+        libxml_use_internal_errors(true);
+        $doc->loadHTML('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><html><body>' . $cdatastring . '</body></html>');
+        $doc->getElementsByTagName('html')->item(0)->setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+        $xml = $doc->saveXML();
 
-/**
- * Use a DOM parser to accurately replace images with their alt text.
- *
- * @param string $html
- * @return string New html with no image tags.
- */
-function local_glossary_wordimport_strip_images($html) {
-    $dom = new DOMDocument();
-    $dom->loadHTML("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" . $html);
-    $images = $dom->getElementsByTagName('img');
-    $i = 0;
-
-    for ($i = ($images->length - 1); $i >= 0; $i--) {
-        $node = $images->item($i);
-
-        if ($node->hasAttribute('alt')) {
-            $replacement = ' [ ' . $node->getAttribute('alt') . ' ] ';
+        $bodystart = stripos($xml, '<body>') + strlen('<body>');
+        $bodylength = strripos($xml, '</body>') - $bodystart;
+        if ($bodystart || $bodylength) {
+            $cleanxhtml = substr($xml, $bodystart, $bodylength);
         } else {
-            $replacement = ' ';
+            $cleanxhtml = $cdatastring;
         }
 
-        $text = $dom->createTextNode($replacement);
-        $node->parentNode->replaceChild($text, $node);
-    }
-    $count = 1;
-    return str_replace("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>", "", $dom->saveHTML(), $count);
-}
+        // Fix up filenames after @@PLUGINFILE@@ to replace URL-encoded characters with ordinary characters.
+        $foundpluginfilenames = preg_match_all('~(.*?)<img src="@@PLUGINFILE@@/([^"]*)(.*)~s', $cleanxhtml,
+                                    $pluginfilematches, PREG_SET_ORDER);
+        $nummatches = count($pluginfilematches);
+        if ($foundpluginfilenames and $foundpluginfilenames != 0) {
+            $urldecodedstring = "";
+            // Process the possibly-URL-escaped filename so that it matches the name in the file element.
+            for ($i = 0; $i < $nummatches; $i++) {
+                // Decode the filename and add the surrounding text.
+                $decodedfilename = urldecode($pluginfilematches[$i][2]);
+                $urldecodedstring .= $pluginfilematches[$i][1] . '<img src="@@PLUGINFILE@@/' . $decodedfilename .
+                                        $pluginfilematches[$i][3];
+            }
+            $cleanxhtml = $urldecodedstring;
+        }
 
-/**
- * Delete temporary files if debugging disabled
- *
- * @param string $filename name of file to be deleted
- * @return void
- */
-function local_glossary_wordimport_debug_unlink($filename) {
-    if (DEBUG_WORDIMPORT !== DEBUG_DEVELOPER or !(debugging(null, DEBUG_DEVELOPER))) {
-        unlink($filename);
+        // Strip soft hyphens (0xAD, or decimal 173).
+        $cleanxhtml = preg_replace('/\xad/u', '', $cleanxhtml);
+
+        return $cleanxhtml;
+    }
+
+
+    /**
+     * Use a DOM parser to accurately replace images with their alt text.
+     *
+     * @param string $html
+     * @return string New html with no image tags.
+     */
+    strip_images($html) {
+        $dom = new DOMDocument();
+        $dom->loadHTML("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" . $html);
+        $images = $dom->getElementsByTagName('img');
+        $i = 0;
+
+        for ($i = ($images->length - 1); $i >= 0; $i--) {
+            $node = $images->item($i);
+
+            if ($node->hasAttribute('alt')) {
+                $replacement = ' [ ' . $node->getAttribute('alt') . ' ] ';
+            } else {
+                $replacement = ' ';
+            }
+
+            $text = $dom->createTextNode($replacement);
+            $node->parentNode->replaceChild($text, $node);
+        }
+        $count = 1;
+        return str_replace("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>", "", $dom->saveHTML(), $count);
+    }
+
+    /**
+     * Delete temporary files if debugging disabled
+     *
+     * @param string $filename name of file to be deleted
+     * @return void
+     */
+    debug_unlink($filename) {
+        if (DEBUG_WORDIMPORT !== DEBUG_DEVELOPER or !(debugging(null, DEBUG_DEVELOPER))) {
+            unlink($filename);
+        }
     }
 }

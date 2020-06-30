@@ -31,35 +31,32 @@ defined('MOODLE_INTERNAL') || die();
  * @param settings_navigation $settings The settings navigation object
  */
 function local_glossary_wordimport_extend_settings_navigation(settings_navigation $settings) {
-    global $PAGE, $DB, $CFG, $USER;
+    global $PAGE;
 
     $mode = optional_param('mode', '', PARAM_ALPHA);
     $hook = optional_param('hook', 'ALL', PARAM_CLEAN);
 
-    // Do nothing when installing the plugin.
+    // Do nothing when installing the plugin, or if we're not in a glossary.
     if (!$PAGE->cm || $PAGE->cm->modname !== 'glossary') {
         return;
     }
 
-    // Change null_progress_trace to html_progress_trace for debugging.
-    $trace = new null_progress_trace();
-    $trace->output("local_glossary_wordimport_extend_settings_navigation()");
-
     // Use the permissions context to decide whether to add custom links to the activity settings.
     $context = \context_module::instance($PAGE->cm->id);
 
-    // Get the the activity settings menu node from the activity node.
+    // Get the the activity menu node from the navigation settings.
     $menu = $settings->find('modulesettings', settings_navigation::TYPE_SETTING);
-    $trace->output("menu: key = " . $menu->key . "; text = " . $menu->text, 1);
 
+    // Add the import link if the user has the capability.
     if (has_capability('mod/glossary:import', $context)) {
-       $url1 = new moodle_url('/local/glossary_wordimport/index.php', array('id' => $PAGE->cm->id, 'action' => 'import', 'mode' => $mode, 'hook' => $hook));
+       $url1 = new moodle_url('/local/glossary_wordimport/index.php', array('id' => $PAGE->cm->id, 'action' => 'import'));
         $menu->add(get_string('wordimport', 'local_glossary_wordimport'), $url1, navigation_node::TYPE_SETTING, null, null,
                new pix_icon('f/document', '', 'moodle', array('class' => 'iconsmall', 'title' => '')));
     }
 
+    // Add the export link if the user has the capability.
     if (has_capability('mod/glossary:export', $context)) {
-        $url2 = new moodle_url('/local/glossary_wordimport/index.php', array('id' => $PAGE->cm->id, 'action' => 'export', 'mode' => $mode, 'hook' => $hook));
+        $url2 = new moodle_url('/local/glossary_wordimport/index.php', array('id' => $PAGE->cm->id, 'action' => 'export'));
         $menu->add(get_string('wordexport', 'local_glossary_wordimport'), $url2, navigation_node::TYPE_SETTING,
            null, null, new pix_icon('f/document', '', 'moodle', array('class' => 'iconsmall', 'title' => '')));
     }
