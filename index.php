@@ -23,12 +23,15 @@
  */
 
 require(__DIR__.'/../../config.php');
+require_once(__DIR__.'/../../mod/glossary/lib.php');
 require_once(__DIR__.'/locallib.php');
 require_once(__DIR__.'/import_form.php');
 
+use \booktool_wordimport\wordconverter;
+
 $cmid        = required_param('id', PARAM_INT);           // Course Module ID.
 $action    = optional_param('action', 'import', PARAM_TEXT);  // Import or export.
-$cat = optional_param('cat',0, PARAM_ALPHANUM); // Include categories.
+$cat = optional_param('cat', 0, PARAM_ALPHANUM); // Include categories.
 
 // Security checks.
 $cm = get_coursemodule_from_id('glossary', $cmid, 0, false, MUST_EXIST);
@@ -61,7 +64,7 @@ if ($mform->is_cancelled()) {
 } else if ($action == 'export') {
     // Export the current glossary into a Word file using the glossary name as the name.
     $filename = clean_filename(strip_tags(format_string($glossary->name)) . '.doc');
-    $content = glossary_generate_export_file($glossary, NULL, $cat);
+    $content = glossary_generate_export_file($glossary, null, $cat);
 
     send_file($content, $filename, 0, 0, true, true);
     // Read the title and introduction into a string, embedding images.
@@ -91,10 +94,18 @@ if ($mform->is_cancelled()) {
     // A Word file has been uploaded, so process it.
     echo $OUTPUT->header();
     echo $OUTPUT->heading($glossary->name);
-    echo $OUTPUT->heading(get_string('importchapters', 'local_glossary_wordimport'), 3);
 
-    // Should the Word file split into subchapters on 'Heading 2' styles?
-    $splitonsubheadings = property_exists($data, 'splitonsubheadings');
+    // Convert the Word file content into XHTML and an array of images.
+    $imagesforzipping = array();
+    $word2xml = new wordconverter();
+    $htmlcontent = $word2xml->import($data['file'], $imagesforzipping);
+
+    // Add any images to the Zip file.
+    if (count($imagesforzipping) > 0) {
+        foreach ($imagesforzipping as $imagename => $imagedata) {
+            $zipfile->addFromString($imagename, $imagedata);
+        }
+    }
 
     // Get the uploaded Word file and save it to the file system.
     $fs = get_file_storage();
@@ -107,7 +118,7 @@ if ($mform->is_cancelled()) {
     // Save the file to a temporary location on the file system.
     if (!$tmpfilename = $file->copy_content_to_temp()) {
         // Cannot save file.
-        throw new moodle_exception(get_string('errorcreatingfile', 'error', $package->get_filename()));
+        throw new \moodle_exception(get_string('errorcreatingfile', 'error', $package->get_filename()));
     }
 
     // Convert the Word file content and import it into the book.

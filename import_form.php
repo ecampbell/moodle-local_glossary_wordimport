@@ -49,7 +49,9 @@ class local_glossary_wordimport_form extends moodleform {
 
         $mform->addElement('header', 'general', get_string('wordimport', 'local_glossary_wordimport'));
 
-        $mform->addElement('filepicker', 'file', get_string('filetoimport', 'glossary'));
+        // User can select 1 and only 1 Word file which must have a .docx suffix (not .docm or .doc).
+        $mform->addElement('filepicker', 'file', get_string('filetoimport', 'local_glossary_wordimport'), null,
+                           array('subdirs' => 0, 'accepted_types' => array('.docx')));
         $mform->addHelpButton('file', 'filetoimport', 'local_glossary_wordimport');
         $mform->addRule('file', null, 'required', null, 'client');
         $options = array();

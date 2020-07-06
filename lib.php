@@ -49,7 +49,7 @@ function local_glossary_wordimport_extend_settings_navigation(settings_navigatio
 
     // Add the import link if the user has the capability.
     if (has_capability('mod/glossary:import', $context)) {
-       $url1 = new moodle_url('/local/glossary_wordimport/index.php', array('id' => $PAGE->cm->id, 'action' => 'import'));
+        $url1 = new moodle_url('/local/glossary_wordimport/index.php', array('id' => $PAGE->cm->id, 'action' => 'import'));
         $menu->add(get_string('wordimport', 'local_glossary_wordimport'), $url1, navigation_node::TYPE_SETTING, null, null,
                new pix_icon('f/document', '', 'moodle', array('class' => 'iconsmall', 'title' => '')));
     }
