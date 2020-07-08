@@ -23,25 +23,23 @@
  */
 
 require(__DIR__.'/../../config.php');
-require_once(__DIR__.'/../../mod/glossary/lib.php');
 require_once(__DIR__.'/locallib.php');
 require_once(__DIR__.'/import_form.php');
+require_once('lib.php');
+require_once($CFG->dirroot . '/course/lib.php');
+require_once($CFG->dirroot . '/course/modlib.php');
 
-use \booktool_wordimport\wordconverter;
-
-$cmid        = required_param('id', PARAM_INT);           // Course Module ID.
-$action    = optional_param('action', 'import', PARAM_TEXT);  // Import or export.
+$id = required_param('id', PARAM_INT); // Course Module ID.
+$action = optional_param('action', 'import', PARAM_TEXT);  // Import or export.
 $cat = optional_param('cat', 0, PARAM_ALPHANUM); // Include categories.
 
 // Security checks.
-$cm = get_coursemodule_from_id('glossary', $cmid, 0, false, MUST_EXIST);
-$course = $DB->get_record('course', array('id' => $cm->course), '*', MUST_EXIST);
+list ($course, $cm) = get_course_and_cm_from_cmid($id, 'glossary');
 $glossary = $DB->get_record('glossary', array('id' => $cm->instance), '*', MUST_EXIST);
-
 require_course_login($course, true, $cm);
 
 // Check import/export capabilities.
-$context = context_module::instance($cmid);
+$context = context_module::instance($id);
 require_capability('mod/glossary:manageentries', $context);
 if ($action == 'import') {
     require_capability('mod/glossary:import', $context);
@@ -50,62 +48,34 @@ if ($action == 'import') {
 }
 
 // Set up page in case an import has been requested.
-$PAGE->set_url('/local/glossary_wordimport/index.php', array('id' => $id, 'action' => $action));
+$PAGE->set_url('/local/glossary_wordimport/index.php?id=', array('id' => $id));
 $PAGE->set_title($glossary->name);
 $PAGE->set_heading($course->fullname);
+
+// Display the file upload form.
 $mform = new local_glossary_wordimport_form(null, array('id' => $id, 'action' => $action));
+
+// Do some debugging.
+$trace = new html_progress_trace();
 
 // If data submitted, then process and store.
 if ($mform->is_cancelled()) {
     // Form cancelled, go back.
-    if (empty($glossary->id)) {
-        redirect($CFG->wwwroot."/mod/glossary/view.php?id=$cm->id");
+     $trace->output("Cancelled");
+   if (empty($glossary->id)) {
+        redirect($CFG->wwwroot . "/mod/glossary/view.php?id=$cm->id");
     }
 } else if ($action == 'export') {
-    // Export the current glossary into a Word file using the glossary name as the name.
+    // Export the current glossary into Glossary XML, then into XHTML, and write to a Word file.
+    $glossarytext = local_glossary_wordimport_export($glossary, $context);
     $filename = clean_filename(strip_tags(format_string($glossary->name)) . '.doc');
-    $content = glossary_generate_export_file($glossary, null, $cat);
-
-    send_file($content, $filename, 0, 0, true, true);
-    // Read the title and introduction into a string, embedding images.
-    $glossarytext = '<p class="MsoTitle">' . $glossary->name . "</p>\n";
-    $glossarytext .= '<div class="chapter" id="intro">' . $glossary->intro;
-    $glossarytext .= local_glossary_wordimport_base64_images($context->id, 'intro');
-    $glossarytext .= "</div>\n";
-
-    // Append all the chapters to the end of the string, again embedding images.
-    foreach ($allchapters as $chapter) {
-        $glossarytext .= '<div class="chapter" id="' . $chapter->id . '">';
-        // Check if the chapter title is duplicated inside the content, and include it if not.
-        if (!$chapter->subchapter and !strpos($chapter->content, "<h1")) {
-            $glossarytext .= "<h1>" . $chapter->title . "</h1>\n";
-        } else if ($chapter->subchapter and !strpos($chapter->content, "<h2")) {
-            $glossarytext .= "<h2>" . $chapter->title . "</h2>\n";
-        }
-        $glossarytext .= $chapter->content;
-        $glossarytext .= local_glossary_wordimport_base64_images($context->id, 'chapter', $chapter->id);
-        $glossarytext .= "</div>\n";
-    }
-    $glossarytext = local_glossary_wordimport_export($glossarytext);
-    $filename = clean_filename($glossary->name) . '.doc';
     send_file($glossarytext, $filename, 10, 0, true, array('filename' => $filename));
     die;
 } else if ($data = $mform->get_data()) {
     // A Word file has been uploaded, so process it.
     echo $OUTPUT->header();
     echo $OUTPUT->heading($glossary->name);
-
-    // Convert the Word file content into XHTML and an array of images.
-    $imagesforzipping = array();
-    $word2xml = new wordconverter();
-    $htmlcontent = $word2xml->import($data['file'], $imagesforzipping);
-
-    // Add any images to the Zip file.
-    if (count($imagesforzipping) > 0) {
-        foreach ($imagesforzipping as $imagename => $imagedata) {
-            $zipfile->addFromString($imagename, $imagedata);
-        }
-    }
+    echo $OUTPUT->heading(get_string('wordimport', 'local_glossary_wordimport'), 3);
 
     // Get the uploaded Word file and save it to the file system.
     $fs = get_file_storage();
@@ -115,22 +85,24 @@ if ($mform->is_cancelled()) {
     }
     $file = reset($files);
 
+    $trace->output("Saving Word file: " . $tmpfilename);
     // Save the file to a temporary location on the file system.
     if (!$tmpfilename = $file->copy_content_to_temp()) {
         // Cannot save file.
-        throw new \moodle_exception(get_string('errorcreatingfile', 'error', $package->get_filename()));
+        throw new moodle_exception(get_string('errorcreatingfile', 'error', $package->get_filename()));
     }
 
-    // Convert the Word file content and import it into the book.
-    local_glossary_wordimport_import_word($tmpfilename, $glossary, $context, $splitonsubheadings);
+    $trace->output("Processing Word file: " . $tmpfilename);
+    $trace->finished();
+    // Convert the Word file content and import it into the glossary.
+    local_glossary_wordimport_import($tmpfilename, $glossary, $context);
 
-    echo $OUTPUT->continue_button(new moodle_url('/mod/book/view.php', array('id' => $id)));
+    echo $OUTPUT->continue_button(new moodle_url('/mod/glossary/view.php', array('id' => $id)));
     echo $OUTPUT->footer();
     die;
 }
-    echo $OUTPUT->header();
-    echo $OUTPUT->heading($glossary->name);
 
-    $mform->display();
-
-    echo $OUTPUT->footer();
+echo $OUTPUT->header();
+echo $OUTPUT->heading($glossary->name);
+$mform->display();
+echo $OUTPUT->footer();

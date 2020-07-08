@@ -54,11 +54,7 @@ class local_glossary_wordimport_form extends moodleform {
                            array('subdirs' => 0, 'accepted_types' => array('.docx')));
         $mform->addHelpButton('file', 'filetoimport', 'local_glossary_wordimport');
         $mform->addRule('file', null, 'required', null, 'client');
-        $options = array();
-        $options['current'] = get_string('currentglossary', 'glossary');
-        $options['newglossary'] = get_string('newglossary', 'glossary');
-        $mform->addElement('select', 'dest', get_string('destination', 'glossary'), $options);
-        $mform->addHelpButton('dest', 'destination', 'glossary');
+
         $mform->addElement('checkbox', 'catsincl', get_string('importcategories', 'glossary'));
         $mform->addElement('hidden', 'id');
         $mform->setType('id', PARAM_INT);

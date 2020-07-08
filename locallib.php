@@ -23,13 +23,10 @@
  */
 
 defined('MOODLE_INTERNAL') || die;
-// Development: turn on all debug messages and strict warnings.
-define('DEBUG_WORDIMPORT', E_ALL);
-// @codingStandardsIgnoreLine define('DEBUG_WORDIMPORT', 0);
 
-require_once(__DIR__.'/lib.php');
-require_once($CFG->dirroot.'/course/lib.php');
+require_once($CFG->dirroot . '/mod/glossary/lib.php');
 
+use \booktool_wordimport\wordconverter;
 
 /**
  * Convert the Word file into a glossary XML string.
@@ -41,29 +38,76 @@ require_once($CFG->dirroot.'/course/lib.php');
  * @param stdObject $context Context
  * @return string glossary data in an internal structure
  */
-function local_glossary_wordimport_import_word(string $wordfilename, stfObject $glossary, stdObject $context) {
-    global $CFG;
+function local_glossary_wordimport_import(string $wordfilename, stdObject $glossary, stdObject $context) {
+    global $CFG, $COURSE, $USER;
 
-    // Convert the Word file content into XHTML and an array of images.
+    $heading1styleoffset = 1; // Map "Heading 1" styles to <h1>.
+    // Pass 1 - convert the Word file content into XHTML and an array of images.
     $imagesforzipping = array();
     $word2xml = new wordconverter();
-    $word2xml->set_heading1styleOffset(1); // Map "Heading 1" styles to <h1>.
-    $htmlcontent = $word2xml->import($wordfilename, $imagesforzipping);
-    $htmlcontent = $word2xml->body_only($htmlcontent);
+    $word2xml->set_heading1styleOffset($heading1styleoffset);
+    $xhtmlcontent = $word2xml->import($wordfilename, $imagesforzipping);
+    $xhtmlcontent = $word2xml->body_only($xhtmlcontent);
+
+    // Pass 2 - convert XHTML into Moodle Glossary XML using localised table cell labels.
+    // Stylesheet to convert generic XHTML into Moodle Glossary XML.
+    $importstylesheet = __DIR__ . DIR_SEPARATOR . "xhtml2glossary.xsl";
+    // Parameters for XSLT transformation.
+    $parameters = array (
+        'moodle_language' => current_language(),
+        'moodle_textdirection' => (right_to_left()) ? 'rtl' : 'ltr',
+        'heading1stylelevel' => $heading1styleoffset,
+        'imagehandling' => $this->imagehandling, // Are images embedded or referenced.
+        'debug_flag' => '1'
+    );
+
+    $xmlcontainer = "<pass2Container>\n<glossary>" . $xhtmlcontent . "</glossary>\n" . local_glossary_wordimport_get_text_labels() . "\n</pass2Container>";
+    $xsltoutput = $this->convert($xmlcontainer, $importstylesheet, $parameters);
+    $xsltoutput = $this->clean_namespaces($xsltoutput);
+        // Write the XML contents to be transformed, and also include labels data, to avoid having to use document() inside XSLT.
+        if (($nbytes = file_put_contents($tempxmlfilename, $xmloutput)) == 0) {
+            echo $OUTPUT->notification(get_string('cannotwritetotempfile', 'qformat_wordtable', basename($tempxmlfilename)));
+            return false;
+        }
+
+        // Pre-XSLT preparation: merge the WordML and image content from the .docx Word file into one large XML file.
+        // Initialise an XML string to use as a wrapper around all the XML files.
+        $xmldeclaration = '<?xml version="1.0" encoding="UTF-8"?>';
+        $wordmldata = $xmldeclaration . "\n<pass1Container>\n";
+        // Close the merged XML file.
+        $wordmldata .= "</pass1Container>";
+
+
+
+        // @codingStandardsIgnoreLine debugging(__FUNCTION__ . ":" . __LINE__ . ": Run Pass 1 with stylesheet '$stylesheet'", DEBUG_WORDTABLE);
+        $xsltproc = xslt_create();
+        if (!($xsltoutput = xslt_process($xsltproc, $tempxmlfilename, $stylesheet, null, null, $parameters))) {
+            echo $OUTPUT->notification(get_string('transformationfailed', 'qformat_wordtable', $stylesheet));
+            $this->debug_unlink($tempxmlfilename);
+            return false;
+        }
+        $this->debug_unlink($tempxmlfilename);
+        $xhtmlfragment = str_replace("\n", "", substr($xsltoutput, 0, 200));
+
+        $tempxhtmlfilename = $CFG->tempdir . '/' . basename($tempxmlfilename, ".tmp") . ".xhtm";
+        // Write the intermediate (Pass 1) XHTML contents to be transformed in Pass 2, this time including the HTML template too.
+        $xmloutput = "<container>\n" . $xsltoutput . "\n<htmltemplate>\n" . file_get_contents($htmltemplatefilepath) .
+                     "\n</htmltemplate>\n" . $this->get_text_labels() . "\n</container>";
+        if (($nbytes = file_put_contents($tempxhtmlfilename, $xmloutput)) == 0) {
+            echo $OUTPUT->notification(get_string('cannotwritetotempfile', 'qformat_wordtable', basename($tempxhtmlfilename)));
+            return false;
+        }
+
 
     // Split the single HTML file into multiple concepts based on h1 elements.
     $h1matches = null;
     // Grab title and contents of each 'Heading 1' section, which is mapped to h1.
-    $h1matches = preg_split('#<h1>.*</h1>#isU', $htmlcontent);
+    $h1matches = preg_split('#<h1>.*</h1>#isU', $xhtmlcontent);
 
     // Initialise the glossary metadata with general defaults.
-    $glossxml = "<GLOSSARY><INFO><NAME>" . $glossary->name . "</NAME><INTRO></INTRO><INTROFORMAT>1</INTROFORMAT>" .
-        "<ALLOWDUPLICATEDENTRIES>0</ALLOWDUPLICATEDENTRIES><DISPLAYFORMAT>dictionary</DISPLAYFORMAT>" .
-        "<SHOWSPECIAL>1</SHOWSPECIAL><SHOWALPHABET>1</SHOWALPHABET><SHOWALL>1</SHOWALL><ALLOWCOMMENTS>0</ALLOWCOMMENTS>" .
-        "<USEDYNALINK>1</USEDYNALINK><DEFAULTAPPROVAL>1</DEFAULTAPPROVAL><GLOBALGLOSSARY>0</GLOBALGLOSSARY>" .
-        "<ENTBYPAGE>10</ENTBYPAGE><ENTRIES>";
+    $glossxml = "";
 
-    $trace = new html_progress_trace();
+    $trace = new error_log_progress_trace();
     // Create a separate Glossary entry for each concept in the content.
     for ($i = 1; $i < count($h1matches); $i++) {
         // Remove any tags from heading, as it prevents proper import of the chapter title.
@@ -85,7 +129,67 @@ function local_glossary_wordimport_import_word(string $wordfilename, stfObject $
     $glossxml .= "</ENTRIES></INFO></GLOSSARY>";
     // Parse the glossary XML into an internal structure.
     $glossdata = glossary_read_imported_file($glossxml);
-    return $glossdata;
+    return $glossarydata;
+}
+
+/**
+ * Export HTML pages to a Word file
+ *
+ * @param stdClass $glossary Glossary to export
+ * @param context_module $context Current course context
+ * @return string
+ */
+function local_glossary_wordimport_export(stdClass $glossary, context_module $context) {
+    global $CFG, $COURSE, $DB, $USER;
+
+    // Export the current glossary into Glossary XML, then into XHTML, and write to a Word file.
+    $glossaryxml = glossary_generate_export_file($glossary, null, 1); // Include categories.
+    // Get a temporary file and store the XML content to transform.
+    if (!($tempxmlfilename = tempnam($CFG->tempdir, "gls")) || (file_put_contents($tempxmlfilename, $glossaryxml)) == 0) {
+        throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
+    }
+    $glossaryxml = file_get_contents($CFG->tempdir . DIRECTORY_SEPARATOR . "TestGlossary.xml");
+    $glossaryxml = preg_replace('/<\?xml version="1.0" ([^>]*)>/', "", $glossaryxml);
+
+    if (!($tempxmlfilename = tempnam($CFG->tempdir, "mdl")) || (file_put_contents($tempxmlfilename, local_glossary_wordimport_get_text_labels())) == 0) {
+        throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
+    }
+    // Pass 1 - convert the Glossary XML into XHTML and an array of images.
+    // Stylesheet to convert Moodle Glossary XML into generic XHTML.
+    $exportstylesheet = __DIR__ . "/glossary2xhtml.xsl";
+    // Set parameters for XSLT transformation. Note that we cannot use $arguments though.
+    $parameters = array (
+        'moodle_language' => current_language(),
+        'moodle_textdirection' => (right_to_left()) ? 'rtl' : 'ltr',
+        'moodle_release' => $CFG->release,
+        'moodle_url' => $CFG->wwwroot . "/",
+        'moodle_module' => 'glossary',
+        'debug_flag' => '1',
+        'transformationfailed' => get_string('transformationfailed', 'local_glossary_wordimport', $exportstylesheet)
+    );
+
+    // Assemble the glossary contents and localised labels to a single XML file for easier XSLT processing.
+    $pass1input = "<pass1Container>\n" . $glossaryxml .  local_glossary_wordimport_get_text_labels() . "\n</pass1Container>";
+
+    if (!($tempxmlfilename = tempnam($CFG->tempdir, "p1i")) || (file_put_contents($tempxmlfilename, $pass1input) == 0)) {
+        throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
+    }
+    $word2xml = new wordconverter();
+    $glossaryhtml = $word2xml->convert($pass1input, $exportstylesheet, $parameters);
+    $glossaryhtml = preg_replace('/<\?xml version="1.0" ([^>]*)>/', "", $glossaryhtml);
+
+    // Pass 2 - convert XHTML into Word-compatible XHTML using localised table cell labels.
+    if (!($tempxmlfilename = tempnam($CFG->tempdir, "p1o")) || (file_put_contents($tempxmlfilename, $glossaryhtml) == 0)) {
+        throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
+    }
+    // Assemble the glossary contents and localised labels to a single XML file for easier XSLT processing.
+    $pass2input = "<pass2Container>\n" . $glossaryhtml .   "\n</pass2Container>";
+    // Convert the XHTML string into a Word-compatible version, with images converted to Base64 data.
+    $glossaryword = $word2xml->export($pass2input, 'glossary');
+    if (!($tempxmlfilename = tempnam($CFG->tempdir, "p2o")) || (file_put_contents($tempxmlfilename, $glossaryword) == 0)) {
+        throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
+    }
+    return $glossaryhtml;
 }
 
 /**
@@ -100,9 +204,9 @@ function local_glossary_wordimport_get_text_labels() {
 
     // Release-independent list of all strings required in the XSLT stylesheets for labels etc.
     $textstrings = array(
-        'glossary' => array('concept', 'definition', 'entryusedynalink', 'entryusedynalink_help', 'fullmatch', 'fullmatch_help',
-            'keywords', 'linking', 'pluginname', 'pluginnamesummary'),
-        'moodle' => array('attachment', 'no', 'yes', 'tags'),
+        'glossary' => array('aliases', 'concept',  'categories', 'definition', 'entryusedynalink',
+            'fullmatch', 'linking', 'pluginname'),
+        'moodle' => array('no', 'yes', 'tags'),
         );
 
     $expout = "<moodlelabels>\n";
