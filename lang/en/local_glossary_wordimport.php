@@ -34,6 +34,7 @@ $string['replaceglossary'] = 'Replace glossary';
 $string['replaceglossary_help'] = 'Delete the current content of glossary before importing';
 $string['stylesheetunavailable'] = 'XSLT Stylesheet <b>{$a}</b> is not available';
 $string['transformationfailed'] = 'XSLT transformation failed (<b>{$a}</b>)';
+$string['teacherentry'] = 'Teacher entry';
 $string['wordexport'] = 'Export to Microsoft Word file';
 $string['wordimport'] = 'Import from Microsoft Word file';
 $string['xsltunavailable'] = 'You need the XSLT library installed in PHP to save this Word file';

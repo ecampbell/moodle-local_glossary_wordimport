@@ -62,6 +62,7 @@
 <xsl:variable name="blank_cell" select="'&#160;'"/>
 
 <!-- Create the list of labels from text strings in Moodle, to maximise familiarity of Word file labels -->
+<xsl:variable name="casesensitive_label" select="concat($moodle_labels/data[@name = 'glossary_casesensitive'], $colon_string)"/>
 <xsl:variable name="categories_label" select="concat($moodle_labels/data[@name = 'glossary_categories'], $colon_string)"/>
 <xsl:variable name="concept_label" select="concat($moodle_labels/data[@name = 'glossary_concept'], $colon_string)"/>
 <xsl:variable name="definition_label" select="concat($moodle_labels/data[@name = 'glossary_definition'], $colon_string)"/>
@@ -72,6 +73,7 @@
 <xsl:variable name="no_label" select="$moodle_labels/data[@name = 'moodle_no']"/>
 <xsl:variable name="pluginname_label" select="concat($moodle_labels/data[@name = 'glossary_pluginname'], $colon_string)"/>
 <xsl:variable name="tags_label" select="concat($moodle_labels/data[@name = 'moodle_tags'], $colon_string)"/>
+<xsl:variable name="teacherentry_label" select="concat($moodle_labels/data[@name = 'local_glossary_wordimport_teacherentry'], $colon_string)"/>
 <xsl:variable name="yes_label" select="$moodle_labels/data[@name = 'moodle_yes']"/>
 
 
@@ -82,39 +84,55 @@
 <xsl:variable name="col2_2span_width" select="'width: 2.0cm'"/>
 
 <!-- Match document root node, and read in and process Word-compatible XHTML template -->
-<xsl:template match="/pass1Container/GLOSSARY">
-    <xsl:variable name="glossary_name" select="INFO/NAME/*"/>
-    <html>
-        <head>
-            <title><xsl:value-of select="$glossary_name"/></title>
-        </head>
-        <body>
-            <!--<xsl:comment><xsl:value-of select="concat('Release: ', $moodle_release, '; rel_number: ', $moodle_release_number)"/></xsl:comment>-->
-            <p class="MsoTitle"><xsl:value-of select="$glossary_name"/></p>
-            <xsl:apply-templates select="INFO/ENTRIES/ENTRY"/>
-        </body>
-    </html>
+<xsl:template match="/pass1Container">
+    <xsl:apply-templates select="GLOSSARY"/>
+</xsl:template>
+
+<xsl:template match="GLOSSARY">
+    <div>
+        <p class="MsoTitle"><xsl:apply-templates select="INFO/NAME/*"/></p>
+        <xsl:apply-templates select="INFO/ENTRIES/ENTRY"/>
+    </div>
 </xsl:template>
 
 <!-- Throw away extra wrapper elements included in container XML -->
-<xsl:template match="/container/moodlelabels"/>
-
-<!-- Omit any Numerical, Random or Calculated questions because we don't want to attempt to import them later
-<xsl:template match="question[@type = 'numerical']"/>
-<xsl:template match="question[starts-with(@type, 'calc')]"/>
-<xsl:template match="question[starts-with(@type, 'random')]"/>
--->
-<!-- Category becomes a Heading 1 style -->
-<!-- There can be lots of categories, but they can also be duplicated -->
+<xsl:template match="/pass1Container/moodlelabels"/>
 <xsl:template match="ENTRY">
     <div>
         <h1 class="MsoHeading1"><xsl:value-of select="CONCEPT"/></h1>
         <table><thead>
             <tr>
-                <th style="{$col1_width}"><xsl:apply-templates select="DEFINITION"/></th>
+                <th style="{$col1_width}"><p class="Cell"><xsl:apply-templates select="DEFINITION"/></p></th>
                 <th style="{$col2_width}"><p class="QFType">GL</p></th>
             </tr>
-        </thead></table>
+            <tr>
+                <th style="{$col1_width}"><p class="TableRowHead"><xsl:value-of select="$entryusedynalink_label"/></p></th>
+                <th style="{$col2_width}"><p class="Cell"><xsl:apply-templates select="USEDYNALINK"/></p></th>
+            </tr>
+            <tr>
+                <th style="{$col1_width}"><p class="TableRowHead"><xsl:value-of select="$casesensitive_label"/></p></th>
+                <th style="{$col2_width}"><p class="Cell"><xsl:apply-templates select="CASESENSITIVE"/></p></th>
+            </tr>
+            <tr>
+                <th style="{$col1_width}"><p class="TableRowHead"><xsl:value-of select="$fullmatch_label"/></p></th>
+                <th style="{$col2_width}"><p class="Cell"><xsl:apply-templates select="FULLMATCH"/></p></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="{$col1_width}"><p class="TableRowHead"><xsl:value-of select="$keywords_label"/></p></td>
+                <td style="{$col2_width}"><p class="Cell"><xsl:apply-templates select="ALIASES/ALIAS/NAME"/></p></td>
+            </tr>
+            <xsl:apply-templates select="CATEGORIES"/>
+            <tr>
+                <td style="{$col1_width}"><p class="TableRowHead"><xsl:value-of select="$teacherentry_label"/></p></td>
+                <td style="{$col2_width}"><p class="Cell"><xsl:apply-templates select="TEACHERENTRY"/></p></td>
+            </tr>
+            <tr>
+                <td style="{$col1_width}"><xsl:value-of select="$tags_label"/></td>
+                <td style="{$col2_width}"><p class="Cell"><xsl:apply-templates select="TAGS"/></p></td>
+            </tr>
+        </tbody></table>
         <p class="MsoBodyText"><xsl:value-of select="$blank_cell"/></p>
     </div>
 </xsl:template>
@@ -129,7 +147,7 @@
 
         <xsl:choose>
         <!-- If the string is wrapped in <p>...</p>, get rid of it -->
-        <xsl:when test="starts-with($raw_text, '&lt;p&gt;') and substring($raw_text, -4) = '&lt;/p&gt;'">
+        <xsl:when test="starts-with($raw_text, '&lt;p&gt;')">
             <!-- 7 = string-length('<p>') + string-length('</p>') </p> -->
             <xsl:value-of select="substring($raw_text, 4, string-length($raw_text) - 7)"/>
         </xsl:when>
@@ -145,9 +163,72 @@
     <xsl:value-of select="$text_string" disable-output-escaping="yes"/>
 </xsl:template>
 
+<xsl:template match="USEDYNALINK">
+    <xsl:choose>
+    <xsl:when test=". = '1'"><xsl:value-of select="$yes_label"/></xsl:when>
+    <xsl:otherwise><xsl:value-of select="$no_label"/></xsl:otherwise>
+    </xsl:choose>
+</xsl:template>
+
+<xsl:template match="CASESENSITIVE">
+    <xsl:choose>
+    <xsl:when test=". = '1'"><xsl:value-of select="$yes_label"/></xsl:when>
+    <xsl:otherwise><xsl:value-of select="$no_label"/></xsl:otherwise>
+    </xsl:choose>
+</xsl:template>
+
+<xsl:template match="FULLMATCH">
+    <xsl:choose>
+    <xsl:when test=". = '1'"><xsl:value-of select="$yes_label"/></xsl:when>
+    <xsl:otherwise><xsl:value-of select="$no_label"/></xsl:otherwise>
+    </xsl:choose>
+</xsl:template>
+
+<xsl:template match="TEACHERENTRY">
+    <xsl:choose>
+    <xsl:when test=". = '1'"><xsl:value-of select="$yes_label"/></xsl:when>
+    <xsl:otherwise><xsl:value-of select="$no_label"/></xsl:otherwise>
+    </xsl:choose>
+</xsl:template>
+
+<xsl:template match="TAGS">
+    <xsl:choose>
+    <xsl:when test="TAG = ''">
+        <!-- tag element present but empty -->
+        <xsl:value-of select="$blank_cell"/>
+    </xsl:when>
+    <xsl:when test="TAG">
+        <!-- tag element present and not empty -->
+            <xsl:for-each select="TAG">
+                <xsl:value-of select="normalize-space(.)"/>
+                <xsl:if test="position() != last()">
+                    <xsl:text>, </xsl:text>
+                </xsl:if>
+            </xsl:for-each>
+    </xsl:when>
+    <xsl:otherwise><xsl:value-of select="$blank_cell"/></xsl:otherwise>
+    </xsl:choose>
+</xsl:template>
+
+
+<xsl:template match="CATEGORIES">
+    <xsl:apply-templates/>
+</xsl:template>
+
+<xsl:template match="CATEGORY">
+    <tr>
+        <td><p class="Cell"><xsl:apply-templates select="NAME"/></p></td>
+        <td><p class="Cell">
+            <xsl:choose>
+            <xsl:when test="USEDYNALINK = '1'"><xsl:value-of select="$yes_label"/></xsl:when>
+            <xsl:otherwise><xsl:value-of select="$no_label"/></xsl:otherwise>
+            </xsl:choose>
+        </p></td>
+    </tr>
+</xsl:template>
 
 <!-- Handle images associated with '@@PLUGINFILE@@' keyword by including them in temporary supplementary paragraphs in whatever component they occur in -->
-<xsl:template match="file">
+<xsl:template match="FILE">
     <xsl:param name="image_id"/>
 
     <xsl:variable name="image_file_suffix">
