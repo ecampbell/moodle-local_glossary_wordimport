@@ -82,7 +82,6 @@ if (!$data) { // Display the form.
     $mform->display();
 } else {
     // A Word file has been uploaded, so save it to the file system for processing.
-    $trace->output("File uploaded");
     $fs = get_file_storage();
     $draftid = file_get_submitted_draft_itemid('importfile');
     if (!$files = $fs->get_area_files(context_user::instance($USER->id)->id, 'user', 'draft', $draftid, 'id DESC', false)) {
@@ -96,9 +95,8 @@ if (!$data) { // Display the form.
         throw new moodle_exception(get_string('errorcreatingfile', 'error', $package->get_filename()));
     }
 
-    $trace->output("Processing Word file: " . $tmpfilename);
     // Convert the Word file content and import it into the glossary.
-    local_glossary_wordimport_import($tmpfilename, $glossary, $context);
+    local_glossary_wordimport_import($tmpfilename);
 
     echo $OUTPUT->continue_button(new moodle_url('/mod/glossary/view.php', array('id' => $id)));
 }

@@ -34,12 +34,10 @@ use \booktool_wordimport\wordconverter;
  * A string containing Glossary XML data is returned
  *
  * @param string $wordfilename Word file to be processed into XML
- * @param stdObject $glossary Glossary object
- * @param context_module $context
  * @return string glossary data in an internal structure
  */
-function local_glossary_wordimport_import(string $wordfilename, stdClass $glossary, context_module $context) {
-    global $CFG, $COURSE, $USER;
+function local_glossary_wordimport_import(string $wordfilename) {
+    global $CFG;
 
     $heading1styleoffset = 1; // Map "Heading 1" styles to <h1>.
     // Pass 1 - convert the Word file content into XHTML and an array of images.
@@ -72,7 +70,6 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
     }
 
-
     // Close the glossary XML.
     // Parse the glossary XML into an internal structure.
     $glossarydata = glossary_read_imported_file($glossaryxml);
@@ -83,11 +80,9 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
  * Export HTML pages to a Word file
  *
  * @param stdClass $glossary Glossary to export
- * @param context_module $context Current course context
  * @return string
  */
-function local_glossary_wordimport_export(stdClass $glossary, context_module $context) {
-    global $CFG, $COURSE, $DB, $USER;
+function local_glossary_wordimport_export(stdClass $glossary) {
 
     // Export the current glossary into Glossary XML, then into XHTML, and write to a Word file.
     $glossaryxml = glossary_generate_export_file($glossary, null, 0); // Include categories.
@@ -177,9 +172,10 @@ function local_glossary_wordimport_get_text_labels() {
  *
  * This code is a stripped-down version of /mod/glossary/import.php copied from
  * @param string $glossdata Glossary data in internal structure
- * @return void
+ * @param context_module $context Current course context
+ * @return string
  */
-function local_glossary_wordimport_process(string $glossdata) {
+function local_glossary_wordimport_process(string $glossdata, context_module $context) {
     global $CFG, $OUTPUT, $DB, $USER;
 
     $importedentries = 0;
