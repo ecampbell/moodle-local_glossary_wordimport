@@ -22,7 +22,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-/* This file contains code based on mod/glossary/tool/importhtml/import_form.php
+/* This file contains code based on mod/book/tool/importhtml/import_form.php
  * (copyright 2004-2011 Petr Skoda) from Moodle 2.4. */
 
 defined('MOODLE_INTERNAL') || die;
@@ -45,20 +45,27 @@ class local_glossary_wordimport_form extends moodleform {
      */
 
     public function definition() {
-        $mform =& $this->_form;
+        $mform = $this->_form;
+        $data  = $this->_customdata;
 
         $mform->addElement('header', 'general', get_string('wordimport', 'local_glossary_wordimport'));
 
         // User can select 1 and only 1 Word file which must have a .docx suffix (not .docm or .doc).
-        $mform->addElement('filepicker', 'file', get_string('filetoimport', 'local_glossary_wordimport'), null,
+        $mform->addElement('filepicker', 'importfile', get_string('filetoimport', 'local_glossary_wordimport'), null,
                            array('subdirs' => 0, 'accepted_types' => array('.docx')));
-        $mform->addHelpButton('file', 'filetoimport', 'local_glossary_wordimport');
-        $mform->addRule('file', null, 'required', null, 'client');
+        $mform->addHelpButton('importfile', 'filetoimport', 'local_glossary_wordimport');
+        $mform->addRule('importfile', null, 'required', null, 'client');
 
         $mform->addElement('checkbox', 'catsincl', get_string('importcategories', 'glossary'));
+
         $mform->addElement('hidden', 'id');
         $mform->setType('id', PARAM_INT);
+
+        $mform->addElement('hidden', 'action');
+        $mform->setType('action', PARAM_TEXT);
+
         $this->add_action_buttons(true, get_string('import'));
+        $this->set_data($data);
     }
 
     /**
@@ -76,14 +83,10 @@ class local_glossary_wordimport_form extends moodleform {
             return $errors;
         }
 
-        if (empty($data['file'])) {
-            $errors['file'] = get_string('uploadcsvfilerequired', 'tool_uploadblocksettings');
-        }
-
         $usercontext = context_user::instance($USER->id);
         $fs = get_file_storage();
 
-        if (!$files = $fs->get_area_files($usercontext->id, 'user', 'draft', $data['file'], 'id', false)) {
+        if (!$files = $fs->get_area_files($usercontext->id, 'user', 'draft', $data['importfile'], 'id', false)) {
             $errors['importfile'] = get_string('required');
             return $errors;
         } else {

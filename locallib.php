@@ -35,10 +35,10 @@ use \booktool_wordimport\wordconverter;
  *
  * @param string $wordfilename Word file to be processed into XML
  * @param stdObject $glossary Glossary object
- * @param stdObject $context Context
+ * @param context_module $context
  * @return string glossary data in an internal structure
  */
-function local_glossary_wordimport_import(string $wordfilename, stdObject $glossary, stdObject $context) {
+function local_glossary_wordimport_import(string $wordfilename, stdClass $glossary, context_module $context) {
     global $CFG, $COURSE, $USER;
 
     $heading1styleoffset = 1; // Map "Heading 1" styles to <h1>.
@@ -48,6 +48,9 @@ function local_glossary_wordimport_import(string $wordfilename, stdObject $gloss
     $word2xml->set_heading1styleOffset($heading1styleoffset);
     $xhtmlcontent = $word2xml->import($wordfilename, $imagesforzipping);
     $xhtmlcontent = $word2xml->body_only($xhtmlcontent);
+    if (!($tempxmlfilename = tempnam($CFG->tempdir, "w2x")) || (file_put_contents($tempxmlfilename, $xhtmlcontent)) == 0) {
+        throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
+    }
 
     // Pass 2 - convert XHTML into Moodle Glossary XML using localised table cell labels.
     // Stylesheet to convert generic XHTML into Moodle Glossary XML.
@@ -57,13 +60,18 @@ function local_glossary_wordimport_import(string $wordfilename, stdObject $gloss
         'moodle_language' => current_language(),
         'moodle_textdirection' => (right_to_left()) ? 'rtl' : 'ltr',
         'heading1stylelevel' => $heading1styleoffset,
-        'imagehandling' => $this->imagehandling, // Are images embedded or referenced.
+        // 'imagehandling' => $this->imagehandling, // Are images embedded or referenced.
         'debug_flag' => '1'
     );
 
-    $xmlcontainer = "<pass2Container>\n<glossary>" . $xhtmlcontent . "</glossary>\n" . local_glossary_wordimport_get_text_labels() . "\n</pass2Container>";
-    $xsltoutput = $this->convert($xmlcontainer, $importstylesheet, $parameters);
-    $glossaryxml = $this->clean_namespaces($xsltoutput);
+    $xmlcontainer = "<pass2Container>\n<glossary>" . $xhtmlcontent . "</glossary>\n" .
+        local_glossary_wordimport_get_text_labels() . "\n</pass2Container>";
+    $xsltoutput = $word2xml->convert($xmlcontainer, $importstylesheet, $parameters);
+    $glossaryxml = $word2xml->clean_namespaces($xsltoutput);
+    if (!($tempxmlfilename = tempnam($CFG->tempdir, "x2g")) || (file_put_contents($tempxmlfilename, $glossaryxml)) == 0) {
+        throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
+    }
+
 
     // Close the glossary XML.
     // Parse the glossary XML into an internal structure.

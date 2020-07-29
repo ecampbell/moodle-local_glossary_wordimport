@@ -26,12 +26,14 @@ require(__DIR__.'/../../config.php');
 require_once(__DIR__.'/locallib.php');
 require_once(__DIR__.'/import_form.php');
 require_once('lib.php');
+require_once($CFG->dirroot . '/mod/glossary/locallib.php');
 require_once($CFG->dirroot . '/course/lib.php');
 require_once($CFG->dirroot . '/course/modlib.php');
+require_once($CFG->libdir . '/filelib.php');
 
-$id = required_param('id', PARAM_INT); // Course Module ID.
-$action = optional_param('action', 'import', PARAM_TEXT);  // Import or export.
-$cat = optional_param('cat', 0, PARAM_ALPHANUM); // Include categories.
+$id = required_param('id', PARAM_INT); // Course Module ID (this glossary).
+$action = optional_param('action', 'import', PARAM_TEXT);  // Import or export action.
+$cat = optional_param('cat', 0, PARAM_ALPHANUM); // Include term categories.
 
 // Security checks.
 list ($course, $cm) = get_course_and_cm_from_cmid($id, 'glossary');
@@ -39,7 +41,7 @@ $glossary = $DB->get_record('glossary', array('id' => $cm->instance), '*', MUST_
 require_course_login($course, true, $cm);
 
 // Check import/export capabilities.
-$context = context_module::instance($id);
+$context = context_module::instance($cm->id);
 require_capability('mod/glossary:manageentries', $context);
 if ($action == 'import') {
     require_capability('mod/glossary:import', $context);
@@ -48,36 +50,39 @@ if ($action == 'import') {
 }
 
 // Set up page in case an import has been requested.
-$PAGE->set_url('/local/glossary_wordimport/index.php?id=', array('id' => $id));
+$PAGE->set_url('/local/glossary_wordimport/index.php', array('id' => $id, 'action' => $action));
 $PAGE->set_title($glossary->name);
 $PAGE->set_heading($course->fullname);
-
-// Display the file upload form.
-$mform = new local_glossary_wordimport_form(null, array('id' => $id, 'action' => $action));
 
 // Do some debugging.
 $trace = new html_progress_trace();
 
-// If data submitted, then process and store.
-if ($mform->is_cancelled()) {
-    // Form cancelled, go back.
-     $trace->output("Cancelled");
-   if (empty($glossary->id)) {
-        redirect($CFG->wwwroot . "/mod/glossary/view.php?id=$cm->id");
-    }
-} else if ($action == 'export') {
+// If exporting, just convert the glossary terms into Word.
+if ($action == 'export') {
     // Export the current glossary into Glossary XML, then into XHTML, and write to a Word file.
     $glossarytext = local_glossary_wordimport_export($glossary, $context);
     $filename = clean_filename(strip_tags(format_string($glossary->name)) . '.doc');
     send_file($glossarytext, $filename, 10, 0, true, array('filename' => $filename));
     die;
-} else if ($data = $mform->get_data()) {
-    // A Word file has been uploaded, so process it.
+}
+
+// Set up the Word file upload form.
+$mform = new local_glossary_wordimport_form(null, array('id' => $id, 'action' => $action));
+if ($mform->is_cancelled()) {
+    // Form cancelled, go back.
+    $trace->output("Cancelled");
+    redirect($CFG->wwwroot . "/mod/glossary/view.php?id=$cm->id");
+}
+
+// Display or process the Word file upload form.
+$data = $mform->get_data();
+if (!$data) { // Display the form.
     echo $OUTPUT->header();
     echo $OUTPUT->heading($glossary->name);
-    echo $OUTPUT->heading(get_string('wordimport', 'local_glossary_wordimport'), 3);
-
-    // Get the uploaded Word file and save it to the file system.
+    $mform->display();
+} else {
+    // A Word file has been uploaded, so save it to the file system for processing.
+    $trace->output("File uploaded");
     $fs = get_file_storage();
     $draftid = file_get_submitted_draft_itemid('importfile');
     if (!$files = $fs->get_area_files(context_user::instance($USER->id)->id, 'user', 'draft', $draftid, 'id DESC', false)) {
@@ -85,7 +90,6 @@ if ($mform->is_cancelled()) {
     }
     $file = reset($files);
 
-    $trace->output("Saving Word file: " . $tmpfilename);
     // Save the file to a temporary location on the file system.
     if (!$tmpfilename = $file->copy_content_to_temp()) {
         // Cannot save file.
@@ -93,16 +97,10 @@ if ($mform->is_cancelled()) {
     }
 
     $trace->output("Processing Word file: " . $tmpfilename);
-    $trace->finished();
     // Convert the Word file content and import it into the glossary.
     local_glossary_wordimport_import($tmpfilename, $glossary, $context);
 
     echo $OUTPUT->continue_button(new moodle_url('/mod/glossary/view.php', array('id' => $id)));
-    echo $OUTPUT->footer();
-    die;
 }
 
-echo $OUTPUT->header();
-echo $OUTPUT->heading($glossary->name);
-$mform->display();
 echo $OUTPUT->footer();
