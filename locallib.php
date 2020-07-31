@@ -64,8 +64,8 @@ function local_glossary_wordimport_import(string $wordfilename) {
 
     $xmlcontainer = "<pass2Container>\n<glossary>" . $xhtmlcontent . "</glossary>\n" .
         local_glossary_wordimport_get_text_labels() . "\n</pass2Container>";
-    $xsltoutput = $word2xml->convert($xmlcontainer, $importstylesheet, $parameters);
-    $glossaryxml = $word2xml->clean_namespaces($xsltoutput);
+    $glossaryxml = $word2xml->convert($xmlcontainer, $importstylesheet, $parameters);
+    // $glossaryxml = $word2xml->clean_namespaces($xsltoutput);
     if (!($tempxmlfilename = tempnam($CFG->tempdir, "x2g")) || (file_put_contents($tempxmlfilename, $glossaryxml)) == 0) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
     }

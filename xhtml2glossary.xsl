@@ -22,11 +22,13 @@
  * @author Eoin Campbell
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later (5)
 -->
-<xsl:stylesheet version="1.0" exclude-result-prefixes="dc wd"
+<xsl:stylesheet exclude-result-prefixes="htm o w"
     xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-    xmlns:dc="http://purl.org/dc/elements/1.1/"
-    xmlns:wd="http://www.xmlw.ie/webdoc/"
->
+    xmlns:o="urn:schemas-microsoft-com:office:office"
+    xmlns:w="urn:schemas-microsoft-com:office:word"
+    xmlns:htm="http://www.w3.org/1999/xhtml"
+    xmlns="http://www.w3.org/1999/xhtml"
+    version="1.0">
 
 <!-- Settings -->
 <xsl:output encoding="UTF-8" method="xml" indent="yes" />
@@ -36,9 +38,11 @@
 <xsl:param name="moodle_release"/>  <!-- The release number of the current Moodle server -->
 <xsl:param name="moodle_language"/>  <!-- The current language interface selected by the user -->
 
+<xsl:variable name="ucase" select="'ABCDEFGHIJKLMNOPQRSTUVWXYZ'" />
+<xsl:variable name="lcase" select="'abcdefghijklmnopqrstuvwxyz'" />
 <!-- Top Level Variables derived from input -->
-<xsl:variable name="metadata" select="//x:html/x:head"/>
-<xsl:variable name="courseID" select="$metadata/x:meta[@name='moodleCourseID']/@content" />
+<xsl:variable name="metadata" select="//htm:html/htm:head"/>
+<xsl:variable name="courseID" select="$metadata/htm:meta[@name='moodleCourseID']/@content" />
 <!-- Get the Moodle version as a simple 2-digit number, e.g. 2.6.5 => 26 -->
 <xsl:variable name="moodleReleaseNumber" select="substring(translate($moodle_release, '.', ''), 1, 2)"/>
 
@@ -46,55 +50,35 @@
 <xsl:param name="moodle_labels_file_stub" select="'../htmltemplates/moodle/moodle_gloss'" />
 
 
-<xsl:variable name="fileLanguage">
-    <xsl:variable name="moodleLanguage" select="$metadata/x:meta[@name='moodleLanguage']/@content" />
-    <xsl:choose>
-    <xsl:when test="$moodleLanguage = ''"><xsl:value-of select="'en'"/></xsl:when>
-    <xsl:when test="contains($moodleLanguage, '_')"><xsl:value-of select="substring-before($moodleLanguage, '_')"/></xsl:when>
-    <xsl:otherwise><xsl:value-of select="$moodleLanguage"/></xsl:otherwise>
-    </xsl:choose>
-</xsl:variable>
-
-<xsl:variable name="language_labels_file">
-    <xsl:variable name="moodle_release_suffix">
-    <xsl:if test="$moodleReleaseNumber = '1'">
-        <xsl:text>1</xsl:text>
-    </xsl:if>
-    </xsl:variable>
-    <xsl:choose>
-    <xsl:when test="$fileLanguage != ''"><xsl:value-of select="concat($moodle_labels_file_stub, $moodle_release_suffix, '_', $fileLanguage, '.xml')"/></xsl:when>
-    <xsl:otherwise><xsl:value-of select="concat($moodle_labels_file_stub, $moodle_release_suffix, '_', 'en.xml')"/></xsl:otherwise>
-    </xsl:choose>
-</xsl:variable>
-<xsl:variable name="moodle_labels" select="document($language_labels_file)/moodlelabels" />
 
     <!-- Default column numbers-->
     <xsl:variable name="nColumns" select="2"/>
     <xsl:variable name="option_colnum" select="2"/>
-    <xsl:variable name="flag_value_colnum" select="1"/>
+    <xsl:variable name="flag_value_colnum" select="2"/>
     <xsl:variable name="specific_feedback_colnum" select="3"/>
     <xsl:variable name="match_colnum" select="3"/>
     <xsl:variable name="generic_feedback_colnum" select="2"/> <!-- 2 because the label cell is a th, not a td -->
     <xsl:variable name="hints_colnum" select="2"/> <!-- 2 because the label cell is a th, not a td -->
-    <xsl:variable name="tags_colnum" select="1"/> <!-- 1 because the label cell is a th, not a td -->
+    <xsl:variable name="tags_colnum" select="2"/> <!-- 1 because the label cell is a th, not a td -->
     <xsl:variable name="graderinfo_colnum" select="3"/>
     <xsl:variable name="responsetemplate_colnum" select="2"/>
 
 <!-- Handle colon usage in French -->
 <xsl:variable name="colon_string">
     <xsl:choose>
-    <xsl:when test="starts-with($fileLanguage, 'fr')"><xsl:text> :</xsl:text></xsl:when>
+    <xsl:when test="starts-with($moodle_language, 'fr')"><xsl:text> :</xsl:text></xsl:when>
     <xsl:otherwise><xsl:text>:</xsl:text></xsl:otherwise>
     </xsl:choose>
 </xsl:variable>
 
 <!-- Generic labels -->
-<xsl:variable name="no_label" select="$moodle_labels/data[@name = 'moodle_no']"/>
-<xsl:variable name="yes_label" select="$moodle_labels/data[@name = 'moodle_yes']"/>
 
 
 
 <!-- Glossary entry form field labels-->
+<xsl:variable name="moodle_labels" select="//moodlelabels"/>
+<xsl:variable name="no_label" select="$moodle_labels/data[@name = 'moodle_no']"/>
+<xsl:variable name="yes_label" select="$moodle_labels/data[@name = 'moodle_yes']"/>
 <xsl:variable name="concept_label" select="$moodle_labels/data[@name = 'glossary_concept']"/>
 <xsl:variable name="definition_label" select="$moodle_labels/data[@name = 'glossary_definition']"/>
 <xsl:variable name="categories_label" select="$moodle_labels/data[@name = 'glossary_categories']"/>
@@ -107,9 +91,11 @@
 <xsl:variable name="attachment_label" select="$moodle_labels/data[@name = 'glossary_attachment']"/>
 <xsl:variable name="attachments_label" select="$moodle_labels/data[@name = 'glossary_attachments']"/>
 
+<!-- Throw away the extra wrapper elements, now we've read them into variables -->
+<xsl:template match="//moodlelabels"/>
 
 <!--    Template Matches        -->
-<xsl:template match="//x:body|//body">
+<xsl:template match="//glossary">
     <GLOSSARY>
         <INFO>
             <NAME>
@@ -119,12 +105,12 @@
 
             <ENTRIES>
 
-                <xsl:for-each select="//x:div">
-                    <xsl:comment>concept: <xsl:value-of select="./h1"/></xsl:comment>
-                    <xsl:comment>definition: <xsl:value-of select="./table/tbody/tr[1]/td[1]"/></xsl:comment>
+                <xsl:for-each select="//h1">
+                    <xsl:comment>concept: <xsl:value-of select="."/></xsl:comment>
+                    <xsl:comment>definition: <xsl:value-of select="../table[1]/thead/tr[1]/th[1]"/></xsl:comment>
                     <xsl:call-template name="termConcept">
-                        <xsl:with-param name="table_root" select="./table" />
-                        <xsl:with-param name="concept" select="./h1" />
+                        <xsl:with-param name="table_root" select="../table[1]" />
+                        <xsl:with-param name="concept" select="." />
                     </xsl:call-template>
                 </xsl:for-each>
             </ENTRIES>
@@ -137,9 +123,9 @@
     <xsl:param name="concept"/>
     <xsl:param name="table_root"/>
 
-    <xsl:variable name="entryusedynalink_value" select="normalize-space(translate($table_root/thead/tr[starts-with(th, $entryusedynalink_label)]/td[position() = $flag_value_colnum], $ucase, $lcase))"/>
-    <xsl:variable name="casesensitive_value" select="normalize-space(translate($table_root/thead/tr[starts-with(th, $entrycasesensitive_label)]/td[position() = $flag_value_colnum], $ucase, $lcase))"/>
-    <xsl:variable name="fullmatch_value" select="normalize-space(translate($table_root/thead/tr[starts-with(th, $fullmatch_label)]/td[position() = $flag_value_colnum], $ucase, $lcase))"/>
+    <xsl:variable name="entryusedynalink_value" select="normalize-space(translate($table_root/thead/tr[starts-with(th[1], $entryusedynalink_label)]/th[2], $ucase, $lcase))"/>
+    <xsl:variable name="casesensitive_value" select="normalize-space(translate($table_root/thead/tr[starts-with(th[1], $casesensitive_label)]/th[position() = $flag_value_colnum], $ucase, $lcase))"/>
+    <xsl:variable name="fullmatch_value" select="normalize-space(translate($table_root/thead/tr[starts-with(th[1], $fullmatch_label)]/th[position() = $flag_value_colnum], $ucase, $lcase))"/>
 
     <ENTRY>
         <CONCEPT>
@@ -147,19 +133,23 @@
         </CONCEPT>
         <DEFINITION>
             <!-- <xsl:value-of select="'&lt;![CDATA['" disable-output-escaping="yes"/> -->
-            <xsl:copy-of select="$table_root/thead/tr[1]/td[1]/*"/>
+            <xsl:copy-of select="$table_root/thead/tr[1]/th[1]/*"/>
             <!-- <xsl:value-of select="']]>'" disable-output-escaping="yes"/> -->
         </DEFINITION>
 
-            <USEDYNALINK><xsl:call-template name="convert_value_to_number"><xsl:with-param name="string_value" select="$entryusedynalink_value"/></xsl:call-template></USEDYNALINK>
-            <CASESENSITIVE><xsl:call-template name="convert_value_to_number"><xsl:with-param name="string_value" select="$casesensitive_value"/></xsl:call-template></CASESENSITIVE>
-            <FULLMATCH><xsl:call-template name="convert_value_to_number"><xsl:with-param name="string_value" select="$fullmatch_value"/></xsl:call-template></FULLMATCH>
+        <xsl:comment>categories_label = <xsl:value-of select="$categories_label"/></xsl:comment>
+        <xsl:comment>entryusedynalink_value = <xsl:value-of select="$entryusedynalink_value"/></xsl:comment>
+        <xsl:comment>casesensitive_value = <xsl:value-of select="$casesensitive_value"/></xsl:comment>
+        <xsl:comment>fullmatch_value = <xsl:value-of select="$fullmatch_value"/></xsl:comment>
+        <USEDYNALINK><xsl:call-template name="convert_value_to_number"><xsl:with-param name="string_value" select="$entryusedynalink_value"/></xsl:call-template></USEDYNALINK>
+        <CASESENSITIVE><xsl:call-template name="convert_value_to_number"><xsl:with-param name="string_value" select="$casesensitive_value"/></xsl:call-template></CASESENSITIVE>
+        <FULLMATCH><xsl:call-template name="convert_value_to_number"><xsl:with-param name="string_value" select="$fullmatch_value"/></xsl:call-template></FULLMATCH>
 
-        <!-- Handle any categories that are included - all in one cell, comma-separated -->
-        <xsl:variable name="keywords_row" select="$table_root/thead/tr[starts-with(th, $keywords_label)]/td[position() = $tags_colnum]"/>
-            <xsl:comment>keywords_label = <xsl:value-of select="$keywords_label"/></xsl:comment>
-            <xsl:comment>keywords_row = <xsl:value-of select="$keywords_row"/></xsl:comment>
-    <xsl:if test="normalize-space($keywords_row) != '' and normalize-space($keywords_row) != '&#160;' and normalize-space($keywords_row) != '_'">
+        <!-- Handle any keywords that are included - all in one cell, comma-separated -->
+        <xsl:comment>keywords_label = <xsl:value-of select="$keywords_label"/></xsl:comment>
+        <xsl:variable name="keywords_row" select="$table_root/thead/tr[starts-with(th[1], $keywords_label)]/th[2]"/>
+        <xsl:comment>keywords_row = <xsl:value-of select="$keywords_row"/></xsl:comment>
+        <xsl:if test="normalize-space($keywords_row) != '' and normalize-space($keywords_row) != '&#160;' and normalize-space($keywords_row) != '_'">
             <ALIASES>
                 <xsl:choose>
                 <xsl:when test="contains($keywords_row, ',')">
@@ -176,7 +166,7 @@
         </xsl:if>
 
         <!-- Handle any categories that are included - all in one cell, comma-separated -->
-        <xsl:variable name="categories_row" select="$table_root/thead/tr[starts-with(th, $categories_label)]/td[position() = $tags_colnum]"/>
+        <xsl:variable name="categories_row" select="$table_root/thead/tr[starts-with(th[1], $categories_label)]/th[2]/*"/>
         <xsl:if test="normalize-space($categories_row) != '' and normalize-space($categories_row) != '&#160;' and normalize-space($categories_row) != '_'">
             <CATEGORIES>
                 <xsl:choose>
@@ -284,19 +274,12 @@
 </xsl:template>
 
 
-<!-- Copy elements as is -->
+<!-- Identity transformations -->
 <xsl:template match="*">
-    <xsl:element name="{translate(name(), $ucase, $lcase)}">
-        <xsl:apply-templates select="@*"/>
-        <xsl:apply-templates />
+    <xsl:element name="{name()}">
+        <xsl:call-template name="copyAttributes" />
+        <xsl:apply-templates select="node()"/>
     </xsl:element>
-</xsl:template>
-
-<!-- copy attributes as is -->
-<xsl:template match="@*">
-    <xsl:attribute name="{translate(name(), $ucase, $lcase)}">
-        <xsl:value-of select="."/>
-    </xsl:attribute>
 </xsl:template>
 
 
@@ -304,7 +287,6 @@
 <xsl:template name="convertUnicode">
     <xsl:param name="txt"/>
 
-    <xsl:variable name="cloze_answer_sep_nl" select="concat($answer_separator_1, '&#x0a;')"/>
     <xsl:choose>
         <!-- If empty (or newline), do nothing: needed to stop newlines between block elements being turned into br elements -->
         <xsl:when test="normalize-space($txt) = ''">
@@ -313,14 +295,6 @@
         <xsl:when test="contains($txt, '&#x9;')">
             <xsl:call-template name="convertUnicode">
                 <xsl:with-param name="txt" select="substring-after($txt, '&#x9;')"/>
-            </xsl:call-template>
-        </xsl:when>
-        <!-- If a | followed by newline, remove the newline -->
-        <xsl:when test="contains($txt, $cloze_answer_sep_nl)">
-            <xsl:value-of select="concat(substring-before($txt, $cloze_answer_sep_nl), $answer_separator_2)"/>
-
-            <xsl:call-template name="convertUnicode">
-                <xsl:with-param name="txt" select="substring-after($txt, $cloze_answer_sep_nl)"/>
             </xsl:call-template>
         </xsl:when>
         <!-- If a newline, insert a br element instead -->
@@ -366,6 +340,12 @@
     <file name="{concat('mqimage_', generate-id(), '.', $image_format)}" encoding="base64">
         <xsl:value-of select="substring-after(@src, 'base64,')"/>
     </file>
+</xsl:template>
+
+<xsl:template name="copyAttributes">
+    <xsl:for-each select="@*">
+        <xsl:attribute name="{name()}"><xsl:value-of select="."/></xsl:attribute>
+    </xsl:for-each>
 </xsl:template>
 
 </xsl:stylesheet>
