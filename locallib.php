@@ -29,16 +29,17 @@ require_once($CFG->dirroot . '/mod/glossary/lib.php');
 use \booktool_wordimport\wordconverter;
 
 /**
- * Convert the Word file into a glossary XML string.
- *
- * A string containing Glossary XML data is returned
+ * Convert the Word file into Glossary XML and import it into the current glossary.
  *
  * @param string $wordfilename Word file to be processed into XML
- * @return string glossary data in an internal structure
+ * @param stdClass $glossary Glossary to import into
+ * @param context_module $context Current course context
+ * @return array Array with 2 elements $importedentries and $rejectedentries
  */
-function local_glossary_wordimport_import(string $wordfilename) {
-    global $CFG;
+function local_glossary_wordimport_import(string $wordfilename, stdClass $glossary, context_module $context) {
+    global $CFG, $OUTPUT, $DB, $USER;
 
+    // Convert the Word file into Glossary XML
     $heading1styleoffset = 1; // Map "Heading 1" styles to <h1>.
     // Pass 1 - convert the Word file content into XHTML and an array of images.
     $imagesforzipping = array();
@@ -50,10 +51,9 @@ function local_glossary_wordimport_import(string $wordfilename) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
     }
 
-    // Pass 2 - convert XHTML into Moodle Glossary XML using localised table cell labels.
-    // Stylesheet to convert generic XHTML into Moodle Glossary XML.
+    // Pass 2 - convert the initial XHTML into Moodle Glossary XML using localised table cell labels.
+    // XSLT stylesheet and parameters to convert generic XHTML into Moodle Glossary XML.
     $importstylesheet = __DIR__ . DIRECTORY_SEPARATOR . "xhtml2glossary.xsl";
-    // Parameters for XSLT transformation.
     $parameters = array (
         'moodle_language' => current_language(),
         'moodle_textdirection' => (right_to_left()) ? 'rtl' : 'ltr',
@@ -65,15 +65,174 @@ function local_glossary_wordimport_import(string $wordfilename) {
     $xmlcontainer = "<pass2Container>\n<glossary>" . $xhtmlcontent . "</glossary>\n" .
         local_glossary_wordimport_get_text_labels() . "\n</pass2Container>";
     $glossaryxml = $word2xml->convert($xmlcontainer, $importstylesheet, $parameters);
+    $glossaryxml = str_replace('<GLOSSARY xmlns="http://www.w3.org/1999/xhtml"', '<GLOSSARY', $glossaryxml);
     // $glossaryxml = $word2xml->clean_namespaces($xsltoutput);
     if (!($tempxmlfilename = tempnam($CFG->tempdir, "x2g")) || (file_put_contents($tempxmlfilename, $glossaryxml)) == 0) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
     }
 
-    // Close the glossary XML.
-    // Parse the glossary XML into an internal structure.
-    $glossarydata = glossary_read_imported_file($glossaryxml);
-    return $glossarydata;
+    // Convert the Glossary XML into an internal structure for importing into database.
+    // This code is copied from /mod/glossary/import.php line 187 onwards.
+    $importedentries = 0;
+    $importedcats    = 0;
+    $entriesrejected = 0;
+    $rejections      = '';
+    $glossarycontext = $context;
+
+    if ($xml = glossary_read_imported_file($glossaryxml)) {
+        $xmlentries = $xml['GLOSSARY']['#']['INFO'][0]['#']['ENTRIES'][0]['#']['ENTRY'];
+        $sizeofxmlentries = is_array($xmlentries) ? count($xmlentries) : 0;
+        for ($i = 0; $i < $sizeofxmlentries; $i++) {
+            // Inserting the entries.
+            $xmlentry = $xmlentries[$i];
+            $newentry = new stdClass();
+            $newentry->concept = trim($xmlentry['#']['CONCEPT'][0]['#']);
+            $definition = $xmlentry['#']['DEFINITION'][0]['#'];
+            if (!is_string($definition)) {
+                print_error('errorparsingxml', 'glossary');
+            }
+            $newentry->definition = trusttext_strip($definition);
+            if (isset($xmlentry['#']['CASESENSITIVE'][0]['#'])) {
+                $newentry->casesensitive = $xmlentry['#']['CASESENSITIVE'][0]['#'];
+            } else {
+                $newentry->casesensitive = $CFG->glossary_casesensitive;
+            }
+
+            $permissiongranted = 1;
+            if ($newentry->concept and $newentry->definition) {
+                if (!$glossary->allowduplicatedentries) {
+                    // Checking if the entry is valid (checking if it is duplicated when should not be).
+                    if ($newentry->casesensitive) {
+                        $dupentry = $DB->record_exists_select('glossary_entries',
+                                        'glossaryid = :glossaryid AND concept = :concept', array(
+                                            'glossaryid' => $glossary->id,
+                                            'concept'    => $newentry->concept));
+                    } else {
+                        $dupentry = $DB->record_exists_select('glossary_entries',
+                                        'glossaryid = :glossaryid AND LOWER(concept) = :concept', array(
+                                            'glossaryid' => $glossary->id,
+                                            'concept'    => core_text::strtolower($newentry->concept)));
+                    }
+                    if ($dupentry) {
+                        $permissiongranted = 0;
+                    }
+                }
+            } else {
+                $permissiongranted = 0;
+            }
+            if ($permissiongranted) {
+                $newentry->glossaryid       = $glossary->id;
+                $newentry->sourceglossaryid = 0;
+                $newentry->approved         = 1;
+                $newentry->userid           = $USER->id;
+                $newentry->teacherentry     = 1;
+                $newentry->definitionformat = $xmlentry['#']['FORMAT'][0]['#'];
+                $newentry->timecreated      = time();
+                $newentry->timemodified     = time();
+
+                // Setting the default values if no values were passed.
+                if (isset($xmlentry['#']['USEDYNALINK'][0]['#'])) {
+                    $newentry->usedynalink      = $xmlentry['#']['USEDYNALINK'][0]['#'];
+                } else {
+                    $newentry->usedynalink      = $CFG->glossary_linkentries;
+                }
+                if (isset($xmlentry['#']['FULLMATCH'][0]['#'])) {
+                    $newentry->fullmatch        = $xmlentry['#']['FULLMATCH'][0]['#'];
+                } else {
+                    $newentry->fullmatch      = $CFG->glossary_fullmatch;
+                }
+
+                $newentry->id = $DB->insert_record("glossary_entries", $newentry);
+                $importedentries++;
+
+                $xmlaliases = @$xmlentry['#']['ALIASES'][0]['#']['ALIAS']; // Ignore missing ALIASES.
+                $sizeofxmlaliases = is_array($xmlaliases) ? count($xmlaliases) : 0;
+                for ($k = 0; $k < $sizeofxmlaliases; $k++) {
+                    // Importing aliases.
+                    $xmlalias = $xmlaliases[$k];
+                    $aliasname = $xmlalias['#']['NAME'][0]['#'];
+
+                    if (!empty($aliasname)) {
+                        $newalias = new stdClass();
+                        $newalias->entryid = $newentry->id;
+                        $newalias->alias = trim($aliasname);
+                        $newalias->id = $DB->insert_record("glossary_alias", $newalias);
+                    }
+                }
+
+                if (!empty($data->catsincl)) {
+                    // If the categories must be imported...
+                    $xmlcats = @$xmlentry['#']['CATEGORIES'][0]['#']['CATEGORY']; // Ignore missing CATEGORIES.
+                    $sizeofxmlcats = is_array($xmlcats) ? count($xmlcats) : 0;
+                    for ($k = 0; $k < $sizeofxmlcats; $k++) {
+                        $xmlcat = $xmlcats[$k];
+
+                        $newcat = new stdClass();
+                        $newcat->name = $xmlcat['#']['NAME'][0]['#'];
+                        $newcat->usedynalink = $xmlcat['#']['USEDYNALINK'][0]['#'];
+                        if (!$category = $DB->get_record("glossary_categories",
+                                array("glossaryid" => $glossary->id, "name" => $newcat->name))) {
+                            // Create the category if it does not exist.
+                            $category = new stdClass();
+                            $category->name = $newcat->name;
+                            $category->glossaryid = $glossary->id;
+                            $category->id = $DB->insert_record("glossary_categories", $category);
+                            $importedcats++;
+                        }
+                        if ($category) {
+                            // Inserting the new relation.
+                            $entrycat = new stdClass();
+                            $entrycat->entryid    = $newentry->id;
+                            $entrycat->categoryid = $category->id;
+                            $DB->insert_record("glossary_entries_categories", $entrycat);
+                        }
+                    }
+                }
+
+                // Import files embedded in the entry text.
+                glossary_xml_import_files($xmlentry['#'], 'ENTRYFILES', $glossarycontext->id, 'entry', $newentry->id);
+
+                // Import files attached to the entry.
+                if (glossary_xml_import_files($xmlentry['#'], 'ATTACHMENTFILES', $glossarycontext->id, 'attachment', $newentry->id)) {
+                    $DB->update_record("glossary_entries", array('id' => $newentry->id, 'attachment' => '1'));
+                }
+
+                // Import tags associated with the entry.
+                if (core_tag_tag::is_enabled('mod_glossary', 'glossary_entries')) {
+                    $xmltags = @$xmlentry['#']['TAGS'][0]['#']['TAG']; // Ignore missing TAGS.
+                    $sizeofxmltags = is_array($xmltags) ? count($xmltags) : 0;
+                    for ($k = 0; $k < $sizeofxmltags; $k++) {
+                        // Importing tags.
+                        $tag = $xmltags[$k]['#'];
+                        if (!empty($tag)) {
+                            core_tag_tag::add_item_tag('mod_glossary', 'glossary_entries', $newentry->id, $glossarycontext, $tag);
+                        }
+                    }
+                }
+
+            } else {
+                $entriesrejected++;
+                if ($newentry->concept and $newentry->definition) {
+                    // Add to exception report (duplicated entry)).
+                    $rejections .= "<tr><td>$newentry->concept</td>" .
+                                   "<td>" . get_string("duplicateentry", "glossary"). "</td></tr>";
+                } else {
+                    // Add to exception report (no concept or definition found)).
+                    $rejections .= "<tr><td>---</td>" .
+                                   "<td>" . get_string("noconceptfound", "glossary"). "</td></tr>";
+                }
+            }
+        }
+        // Reset caches.
+        \mod_glossary\local\concept_cache::reset_glossary($glossary);
+        // Return the number of imported and rejected entries.
+        return array($importedentries, $entriesrejected);
+
+    } else {
+        // Return special number to indicate parsing failure.
+        return array(-1, -1);
+    }
+
 }
 
 /**
@@ -83,6 +242,7 @@ function local_glossary_wordimport_import(string $wordfilename) {
  * @return string
  */
 function local_glossary_wordimport_export(stdClass $glossary) {
+    global $CFG;
 
     // Export the current glossary into Glossary XML, then into XHTML, and write to a Word file.
     $glossaryxml = glossary_generate_export_file($glossary, null, 0); // Include categories.
@@ -165,170 +325,4 @@ function local_glossary_wordimport_get_text_labels() {
     $expout = str_replace("<br>", "<br/>", $expout);
 
     return $expout;
-}
-
-/**
- * Import glossary data into the database
- *
- * This code is a stripped-down version of /mod/glossary/import.php copied from
- * @param string $glossdata Glossary data in internal structure
- * @param context_module $context Current course context
- * @return string
- */
-function local_glossary_wordimport_process(string $glossdata, context_module $context) {
-    global $CFG, $OUTPUT, $DB, $USER;
-
-    $importedentries = 0;
-    $importedcats    = 0;
-    $entriesrejected = 0;
-    $rejections      = '';
-    $glossarycontext = $context;
-
-    $xmlentries = $xml['GLOSSARY']['#']['INFO'][0]['#']['ENTRIES'][0]['#']['ENTRY'];
-    $sizeofxmlentries = is_array($xmlentries) ? count($xmlentries) : 0;
-    for ($i = 0; $i < $sizeofxmlentries; $i++) {
-        // Inserting the entries.
-        $xmlentry = $xmlentries[$i];
-        $newentry = new stdClass();
-        $newentry->concept = trim($xmlentry['#']['CONCEPT'][0]['#']);
-        $definition = $xmlentry['#']['DEFINITION'][0]['#'];
-        if (!is_string($definition)) {
-            print_error('errorparsingxml', 'glossary');
-        }
-        $newentry->definition = trusttext_strip($definition);
-        if (isset($xmlentry['#']['CASESENSITIVE'][0]['#'])) {
-            $newentry->casesensitive = $xmlentry['#']['CASESENSITIVE'][0]['#'];
-        } else {
-            $newentry->casesensitive = $CFG->glossary_casesensitive;
-        }
-
-        $permissiongranted = 1;
-        if ($newentry->concept and $newentry->definition) {
-            if (!$glossary->allowduplicatedentries) {
-                // Checking if the entry is valid (checking if it is duplicated when should not be).
-                if ($newentry->casesensitive) {
-                    $dupentry = $DB->record_exists_select('glossary_entries',
-                                    'glossaryid = :glossaryid AND concept = :concept', array(
-                                        'glossaryid' => $glossary->id,
-                                        'concept'    => $newentry->concept));
-                } else {
-                    $dupentry = $DB->record_exists_select('glossary_entries',
-                                    'glossaryid = :glossaryid AND LOWER(concept) = :concept', array(
-                                        'glossaryid' => $glossary->id,
-                                        'concept'    => core_text::strtolower($newentry->concept)));
-                }
-                if ($dupentry) {
-                    $permissiongranted = 0;
-                }
-            }
-        } else {
-            $permissiongranted = 0;
-        }
-        if ($permissiongranted) {
-            $newentry->glossaryid       = $glossary->id;
-            $newentry->sourceglossaryid = 0;
-            $newentry->approved         = 1;
-            $newentry->userid           = $USER->id;
-            $newentry->teacherentry     = 1;
-            $newentry->definitionformat = $xmlentry['#']['FORMAT'][0]['#'];
-            $newentry->timecreated      = time();
-            $newentry->timemodified     = time();
-
-            // Setting the default values if no values were passed.
-            if (isset($xmlentry['#']['USEDYNALINK'][0]['#'])) {
-                $newentry->usedynalink      = $xmlentry['#']['USEDYNALINK'][0]['#'];
-            } else {
-                $newentry->usedynalink      = $CFG->glossary_linkentries;
-            }
-            if (isset($xmlentry['#']['FULLMATCH'][0]['#'])) {
-                $newentry->fullmatch        = $xmlentry['#']['FULLMATCH'][0]['#'];
-            } else {
-                $newentry->fullmatch      = $CFG->glossary_fullmatch;
-            }
-
-            $newentry->id = $DB->insert_record("glossary_entries", $newentry);
-            $importedentries++;
-
-            $xmlaliases = @$xmlentry['#']['ALIASES'][0]['#']['ALIAS']; // Ignore missing ALIASES.
-            $sizeofxmlaliases = is_array($xmlaliases) ? count($xmlaliases) : 0;
-            for ($k = 0; $k < $sizeofxmlaliases; $k++) {
-                // Importing aliases.
-                $xmlalias = $xmlaliases[$k];
-                $aliasname = $xmlalias['#']['NAME'][0]['#'];
-
-                if (!empty($aliasname)) {
-                    $newalias = new stdClass();
-                    $newalias->entryid = $newentry->id;
-                    $newalias->alias = trim($aliasname);
-                    $newalias->id = $DB->insert_record("glossary_alias", $newalias);
-                }
-            }
-
-            if (!empty($data->catsincl)) {
-                // If the categories must be imported...
-                $xmlcats = @$xmlentry['#']['CATEGORIES'][0]['#']['CATEGORY']; // Ignore missing CATEGORIES.
-                $sizeofxmlcats = is_array($xmlcats) ? count($xmlcats) : 0;
-                for ($k = 0; $k < $sizeofxmlcats; $k++) {
-                    $xmlcat = $xmlcats[$k];
-
-                    $newcat = new stdClass();
-                    $newcat->name = $xmlcat['#']['NAME'][0]['#'];
-                    $newcat->usedynalink = $xmlcat['#']['USEDYNALINK'][0]['#'];
-                    if (!$category = $DB->get_record("glossary_categories",
-                            array("glossaryid" => $glossary->id, "name" => $newcat->name))) {
-                        // Create the category if it does not exist.
-                        $category = new stdClass();
-                        $category->name = $newcat->name;
-                        $category->glossaryid = $glossary->id;
-                        $category->id = $DB->insert_record("glossary_categories", $category);
-                        $importedcats++;
-                    }
-                    if ($category) {
-                        // Inserting the new relation.
-                        $entrycat = new stdClass();
-                        $entrycat->entryid    = $newentry->id;
-                        $entrycat->categoryid = $category->id;
-                        $DB->insert_record("glossary_entries_categories", $entrycat);
-                    }
-                }
-            }
-
-            // Import files embedded in the entry text.
-            glossary_xml_import_files($xmlentry['#'], 'ENTRYFILES', $glossarycontext->id, 'entry', $newentry->id);
-
-            // Import files attached to the entry.
-            if (glossary_xml_import_files($xmlentry['#'], 'ATTACHMENTFILES', $glossarycontext->id, 'attachment', $newentry->id)) {
-                $DB->update_record("glossary_entries", array('id' => $newentry->id, 'attachment' => '1'));
-            }
-
-            // Import tags associated with the entry.
-            if (core_tag_tag::is_enabled('mod_glossary', 'glossary_entries')) {
-                $xmltags = @$xmlentry['#']['TAGS'][0]['#']['TAG']; // Ignore missing TAGS.
-                $sizeofxmltags = is_array($xmltags) ? count($xmltags) : 0;
-                for ($k = 0; $k < $sizeofxmltags; $k++) {
-                    // Importing tags.
-                    $tag = $xmltags[$k]['#'];
-                    if (!empty($tag)) {
-                        core_tag_tag::add_item_tag('mod_glossary', 'glossary_entries', $newentry->id, $glossarycontext, $tag);
-                    }
-                }
-            }
-
-        } else {
-            $entriesrejected++;
-            if ($newentry->concept and $newentry->definition) {
-                // Add to exception report (duplicated entry)).
-                $rejections .= "<tr><td>$newentry->concept</td>" .
-                               "<td>" . get_string("duplicateentry", "glossary"). "</td></tr>";
-            } else {
-                // Add to exception report (no concept or definition found)).
-                $rejections .= "<tr><td>---</td>" .
-                               "<td>" . get_string("noconceptfound", "glossary"). "</td></tr>";
-            }
-        }
-    }
-
-    // Reset caches.
-    \mod_glossary\local\concept_cache::reset_glossary($glossary);
-
 }

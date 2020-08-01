@@ -53,9 +53,8 @@ if ($action == 'import') {
 $PAGE->set_url('/local/glossary_wordimport/index.php', array('id' => $id, 'action' => $action));
 $PAGE->set_title($glossary->name);
 $PAGE->set_heading($course->fullname);
-
-// Do some debugging.
-$trace = new html_progress_trace();
+echo $OUTPUT->header();
+echo $OUTPUT->heading($glossary->name);
 
 // If exporting, just convert the glossary terms into Word.
 if ($action == 'export') {
@@ -70,18 +69,15 @@ if ($action == 'export') {
 $mform = new local_glossary_wordimport_form(null, array('id' => $id, 'action' => $action));
 if ($mform->is_cancelled()) {
     // Form cancelled, go back.
-    $trace->output("Cancelled");
     redirect($CFG->wwwroot . "/mod/glossary/view.php?id=$cm->id");
 }
 
 // Display or process the Word file upload form.
 $data = $mform->get_data();
 if (!$data) { // Display the form.
-    echo $OUTPUT->header();
-    echo $OUTPUT->heading($glossary->name);
     $mform->display();
 } else {
-    // A Word file has been uploaded, so save it to the file system for processing.
+    // Import: save the uploaded Word file to the file system for processing.
     $fs = get_file_storage();
     $draftid = file_get_submitted_draft_itemid('importfile');
     if (!$files = $fs->get_area_files(context_user::instance($USER->id)->id, 'user', 'draft', $draftid, 'id DESC', false)) {
@@ -96,9 +92,42 @@ if (!$data) { // Display the form.
     }
 
     // Convert the Word file content and import it into the glossary.
-    local_glossary_wordimport_import($tmpfilename);
+    list ($importedentries, $entriesrejected) = local_glossary_wordimport_import($tmpfilename, $glossary, $context);
+    if ($importedentries == -1 && $entriesrejected == -1) {
+        echo $OUTPUT->box_start('glossarydisplay generalbox');
+        echo get_string('errorparsingxml', 'glossary');
+        echo $OUTPUT->continue_button(new moodle_url('/mod/glossary/view.php', array('id' => $id)));
+        echo $OUTPUT->box_end();
+     } else {
+        // Print the number of processed entries.
+        echo $OUTPUT->box_start('glossarydisplay generalbox');
+        echo '<table class="glossaryimportexport">';
+        echo '<tr>';
+        echo '<td width="50%" align="right">';
+        echo get_string("totalentries","glossary");
+        echo ':</td>';
+        echo '<td width="50%" align="left">';
+        echo $importedentries + $entriesrejected;
+        echo '</td>';
+        echo '</tr>';
+        echo '<tr>';
+        echo '<td width="50%" align="right">';
+        echo get_string("importedentries","glossary");
+        echo ':</td>';
+        echo '<td width="50%" align="left">';
+        echo $importedentries;
+        if ( $entriesrejected ) {
+            echo ' <small>(' . get_string("rejectedentries","glossary") . ": $entriesrejected)</small>";
+        }
+        echo '</td>';
+        echo '</tr>';
+        echo '</table><hr />';
 
-    echo $OUTPUT->continue_button(new moodle_url('/mod/glossary/view.php', array('id' => $id)));
+        echo $OUTPUT->continue_button(new moodle_url('/mod/glossary/view.php', array('id' => $id)));
+        echo $OUTPUT->box_end();
+    }
+
 }
 
+// Finish the page.
 echo $OUTPUT->footer();

@@ -93,21 +93,35 @@
 
 <!-- Throw away the extra wrapper elements, now we've read them into variables -->
 <xsl:template match="//moodlelabels"/>
-
 <!--    Template Matches        -->
+
+<xsl:template match="/pass2Container">
+    <xsl:apply-templates/>
+</xsl:template>
 <xsl:template match="//glossary">
     <GLOSSARY>
         <INFO>
-            <NAME>
+            <NAME><xsl:value-of select="p[@class = 'title'][1]"/>
             </NAME>
             <INTRO>
             </INTRO>
-
+            <INTROFORMAT>1</INTROFORMAT>
+            <ALLOWDUPLICATEDENTRIES>0</ALLOWDUPLICATEDENTRIES>
+            <DISPLAYFORMAT>dictionary</DISPLAYFORMAT>
+            <SHOWSPECIAL>1</SHOWSPECIAL>
+            <SHOWALPHABET>1</SHOWALPHABET>
+            <SHOWALL>1</SHOWALL>
+            <ALLOWCOMMENTS>0</ALLOWCOMMENTS>
+            <USEDYNALINK>1</USEDYNALINK>
+            <DEFAULTAPPROVAL>1</DEFAULTAPPROVAL>
+            <GLOBALGLOSSARY>1</GLOBALGLOSSARY>
+            <ENTBYPAGE>10</ENTBYPAGE>
             <ENTRIES>
-
                 <xsl:for-each select="//h1">
+                    <!--
                     <xsl:comment>concept: <xsl:value-of select="."/></xsl:comment>
                     <xsl:comment>definition: <xsl:value-of select="../table[1]/thead/tr[1]/th[1]"/></xsl:comment>
+                    -->
                     <xsl:call-template name="termConcept">
                         <xsl:with-param name="table_root" select="../table[1]" />
                         <xsl:with-param name="concept" select="." />
@@ -133,22 +147,27 @@
         </CONCEPT>
         <DEFINITION>
             <!-- <xsl:value-of select="'&lt;![CDATA['" disable-output-escaping="yes"/> -->
-            <xsl:copy-of select="$table_root/thead/tr[1]/th[1]/*"/>
+            <xsl:value-of select="$table_root/thead/tr[1]/th[1]/*"/>
             <!-- <xsl:value-of select="']]>'" disable-output-escaping="yes"/> -->
         </DEFINITION>
 
+        <!--
         <xsl:comment>categories_label = <xsl:value-of select="$categories_label"/></xsl:comment>
         <xsl:comment>entryusedynalink_value = <xsl:value-of select="$entryusedynalink_value"/></xsl:comment>
         <xsl:comment>casesensitive_value = <xsl:value-of select="$casesensitive_value"/></xsl:comment>
         <xsl:comment>fullmatch_value = <xsl:value-of select="$fullmatch_value"/></xsl:comment>
+        -->
+        <FORMAT>1</FORMAT>
         <USEDYNALINK><xsl:call-template name="convert_value_to_number"><xsl:with-param name="string_value" select="$entryusedynalink_value"/></xsl:call-template></USEDYNALINK>
         <CASESENSITIVE><xsl:call-template name="convert_value_to_number"><xsl:with-param name="string_value" select="$casesensitive_value"/></xsl:call-template></CASESENSITIVE>
         <FULLMATCH><xsl:call-template name="convert_value_to_number"><xsl:with-param name="string_value" select="$fullmatch_value"/></xsl:call-template></FULLMATCH>
 
         <!-- Handle any keywords that are included - all in one cell, comma-separated -->
-        <xsl:comment>keywords_label = <xsl:value-of select="$keywords_label"/></xsl:comment>
         <xsl:variable name="keywords_row" select="$table_root/thead/tr[starts-with(th[1], $keywords_label)]/th[2]"/>
+        <!--
+        <xsl:comment>keywords_label = <xsl:value-of select="$keywords_label"/></xsl:comment>
         <xsl:comment>keywords_row = <xsl:value-of select="$keywords_row"/></xsl:comment>
+        -->
         <xsl:if test="normalize-space($keywords_row) != '' and normalize-space($keywords_row) != '&#160;' and normalize-space($keywords_row) != '_'">
             <ALIASES>
                 <xsl:choose>
