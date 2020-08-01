@@ -98,13 +98,13 @@ if (!$data) { // Display the form.
         echo get_string('errorparsingxml', 'glossary');
         echo $OUTPUT->continue_button(new moodle_url('/mod/glossary/view.php', array('id' => $id)));
         echo $OUTPUT->box_end();
-     } else {
+    } else {
         // Print the number of processed entries.
         echo $OUTPUT->box_start('glossarydisplay generalbox');
         echo '<table class="glossaryimportexport">';
         echo '<tr>';
         echo '<td width="50%" align="right">';
-        echo get_string("totalentries","glossary");
+        echo get_string("totalentries", "glossary");
         echo ':</td>';
         echo '<td width="50%" align="left">';
         echo $importedentries + $entriesrejected;
@@ -112,12 +112,12 @@ if (!$data) { // Display the form.
         echo '</tr>';
         echo '<tr>';
         echo '<td width="50%" align="right">';
-        echo get_string("importedentries","glossary");
+        echo get_string("importedentries", "glossary");
         echo ':</td>';
         echo '<td width="50%" align="left">';
         echo $importedentries;
         if ( $entriesrejected ) {
-            echo ' <small>(' . get_string("rejectedentries","glossary") . ": $entriesrejected)</small>";
+            echo ' <small>(' . get_string("rejectedentries", "glossary") . ": $entriesrejected)</small>";
         }
         echo '</td>';
         echo '</tr>';

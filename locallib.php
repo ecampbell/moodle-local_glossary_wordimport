@@ -66,7 +66,6 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
         local_glossary_wordimport_get_text_labels() . "\n</pass2Container>";
     $glossaryxml = $word2xml->convert($xmlcontainer, $importstylesheet, $parameters);
     $glossaryxml = str_replace('<GLOSSARY xmlns="http://www.w3.org/1999/xhtml"', '<GLOSSARY', $glossaryxml);
-    // $glossaryxml = $word2xml->clean_namespaces($xsltoutput);
     if (!($tempxmlfilename = tempnam($CFG->tempdir, "x2g")) || (file_put_contents($tempxmlfilename, $glossaryxml)) == 0) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
     }
@@ -193,7 +192,8 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
                 glossary_xml_import_files($xmlentry['#'], 'ENTRYFILES', $glossarycontext->id, 'entry', $newentry->id);
 
                 // Import files attached to the entry.
-                if (glossary_xml_import_files($xmlentry['#'], 'ATTACHMENTFILES', $glossarycontext->id, 'attachment', $newentry->id)) {
+                if (glossary_xml_import_files($xmlentry['#'], 'ATTACHMENTFILES', $glossarycontext->id, 'attachment',
+                        $newentry->id)) {
                     $DB->update_record("glossary_entries", array('id' => $newentry->id, 'attachment' => '1'));
                 }
 
@@ -250,10 +250,10 @@ function local_glossary_wordimport_export(stdClass $glossary) {
     if (!($tempxmlfilename = tempnam($CFG->tempdir, "gls")) || (file_put_contents($tempxmlfilename, $glossaryxml)) == 0) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
     }
-    // $glossaryxml = file_get_contents($CFG->tempdir . DIRECTORY_SEPARATOR . "TestGlossary2.xml");
     $glossaryxml = preg_replace('/<\?xml version="1.0" ([^>]*)>/', "", $glossaryxml);
 
-    if (!($tempxmlfilename = tempnam($CFG->tempdir, "mdl")) || (file_put_contents($tempxmlfilename, local_glossary_wordimport_get_text_labels())) == 0) {
+    if (!($tempxmlfilename = tempnam($CFG->tempdir, "mdl")) ||
+        (file_put_contents($tempxmlfilename, local_glossary_wordimport_get_text_labels())) == 0) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
     }
     // Pass 1 - convert the Glossary XML into XHTML and an array of images.
