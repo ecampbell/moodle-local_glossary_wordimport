@@ -1,4 +1,4 @@
-<?php
+cd <?php
 // This file is part of Moodle - http://moodle.org/
 //
 // This program is free software: you can redistribute it and/or modify
@@ -29,4 +29,4 @@ $plugin->requires = 2016052300;               // Requires Moodle 3.1 or higher.
 $plugin->component = 'local_glossary_wordimport';   // Full name of the plugin (used for diagnostics).
 $plugin->maturity = MATURITY_BETA;
 $plugin->release = '0.6.0 (Build: 2020080202)'; // Human readable version information.
-$plugin->dependencies = array('booktool_wordimport' => 2020070801);
+$plugin->dependencies = array('booktool_wordimport' => 2020080201);
