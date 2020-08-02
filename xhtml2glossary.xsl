@@ -34,9 +34,11 @@
 <xsl:output encoding="UTF-8" method="xml" indent="yes" />
 
 <!-- Top Level Parameters -->
-<xsl:param name="debug_flag" select="1" />
+<xsl:param name="debug_flag" select="1"/>
 <xsl:param name="moodle_release"/>  <!-- The release number of the current Moodle server -->
 <xsl:param name="moodle_language"/>  <!-- The current language interface selected by the user -->
+<xsl:param name="username"/>  <!-- The current user -->
+<xsl:param name="moodle_labels_file_stub" select="'../htmltemplates/moodle/moodle_gloss'"/>
 
 <xsl:variable name="ucase" select="'ABCDEFGHIJKLMNOPQRSTUVWXYZ'" />
 <xsl:variable name="lcase" select="'abcdefghijklmnopqrstuvwxyz'" />
@@ -45,11 +47,8 @@
 <xsl:variable name="courseID" select="$metadata/htm:meta[@name='moodleCourseID']/@content" />
 <!-- Get the Moodle version as a simple 2-digit number, e.g. 2.6.5 => 26 -->
 <xsl:variable name="moodleReleaseNumber" select="substring(translate($moodle_release, '.', ''), 1, 2)"/>
-
-<!-- Top Level Parameters -->
-<xsl:param name="moodle_labels_file_stub" select="'../htmltemplates/moodle/moodle_gloss'" />
-
-
+<xsl:variable name="image_encoding" select="'base64,'"/>
+    <xsl:variable name="imagesContainer" select="//imagesContainer"/>
 
     <!-- Default column numbers-->
     <xsl:variable name="nColumns" select="2"/>
@@ -73,8 +72,6 @@
 
 <!-- Generic labels -->
 
-
-
 <!-- Glossary entry form field labels-->
 <xsl:variable name="moodle_labels" select="//moodlelabels"/>
 <xsl:variable name="no_label" select="$moodle_labels/data[@name = 'moodle_no']"/>
@@ -93,6 +90,7 @@
 
 <!-- Throw away the extra wrapper elements, now we've read them into variables -->
 <xsl:template match="//moodlelabels"/>
+<xsl:template match="//imagesContainer"/>
 <!--    Template Matches        -->
 
 <xsl:template match="/pass2Container">
@@ -123,7 +121,7 @@
                     <xsl:comment>definition: <xsl:value-of select="../table[1]/thead/tr[1]/th[1]"/></xsl:comment>
                     -->
                     <xsl:call-template name="termConcept">
-                        <xsl:with-param name="table_root" select="following-sibling::table" />
+                        <xsl:with-param name="table_root" select="following-sibling::table[1]" />
                         <xsl:with-param name="concept" select="." />
                     </xsl:call-template>
                 </xsl:for-each>
@@ -140,15 +138,23 @@
     <xsl:variable name="entryusedynalink_value" select="normalize-space(translate($table_root/thead/tr[starts-with(th[1], $entryusedynalink_label)]/th[2], $ucase, $lcase))"/>
     <xsl:variable name="casesensitive_value" select="normalize-space(translate($table_root/thead/tr[starts-with(th[1], $casesensitive_label)]/th[position() = $flag_value_colnum], $ucase, $lcase))"/>
     <xsl:variable name="fullmatch_value" select="normalize-space(translate($table_root/thead/tr[starts-with(th[1], $fullmatch_label)]/th[position() = $flag_value_colnum], $ucase, $lcase))"/>
+    <!-- Any images included? -->
+    <xsl:variable name="contains_image" select="count($table_root/thead/tr[1]/th[1]//img)"/>
 
     <ENTRY>
         <CONCEPT>
             <xsl:value-of select="$concept"/>
         </CONCEPT>
         <DEFINITION>
+
+            <xsl:call-template name="rich_text_content">
+                <xsl:with-param name="content" select="$table_root/thead/tr[1]/th[1]"/>
+            </xsl:call-template>
+<!--
             <xsl:value-of select="'&lt;![CDATA['" disable-output-escaping="yes"/>
             <xsl:copy-of select="$table_root/thead/tr[1]/th[1]/*"/>
             <xsl:value-of select="']]>'" disable-output-escaping="yes"/>
+-->
         </DEFINITION>
 
         <!--
@@ -201,6 +207,14 @@
                 </xsl:choose>
             </CATEGORIES>
         </xsl:if>
+
+    <!-- Process any images -->
+    <xsl:if test="$contains_image != 0">
+        <ENTRYFILES>
+            <xsl:apply-templates select="$table_root/thead/tr[1]/th[1]//img" mode="embedded"/>
+        </ENTRYFILES>
+    </xsl:if>
+
     </ENTRY>
 </xsl:template>
 
@@ -256,20 +270,10 @@
     </xsl:choose>
 </xsl:template>
 
-
-
-
-
 <!-- Omit span elements for language, e.g. span/@lang="en-ie" -->
 <xsl:template match="span[@lang] | a[starts-with(@name, 'Heading')]">
     <xsl:apply-templates/>
 </xsl:template>
-
-
-
-
-
-
 
 <!-- Omit classes beginning with a QF style  -->
 <xsl:template match="@class">
@@ -284,14 +288,12 @@
     </xsl:choose>
 </xsl:template>
 
-
 <!-- Text: check if numbering should be removed -->
 <xsl:template match="text()">
     <xsl:call-template name="convertUnicode">
         <xsl:with-param name="txt" select="."/>
     </xsl:call-template>
 </xsl:template>
-
 
 <!-- Identity transformations -->
 <xsl:template match="*">
@@ -300,7 +302,6 @@
         <xsl:apply-templates select="node()"/>
     </xsl:element>
 </xsl:template>
-
 
 <!-- Handle text, removing text before tabs, deleting non-significant newlines between elements, etc. -->
 <xsl:template name="convertUnicode">
@@ -332,12 +333,116 @@
 
 <!-- Handle images in Moodle 2.x to use PLUGINFILE-->
 
-<xsl:template match="img">
+<!-- Handle rich text content fields in a generic way -->
+<xsl:template name="rich_text_content">
+    <xsl:param name="content"/>
+
+    <!-- Check if the cell contains non-blank text or an image -->
+    <xsl:variable name="content_norm">
+        <xsl:variable name="content_text">
+            <xsl:value-of select="$content"/>
+        </xsl:variable>
+        <xsl:value-of select="normalize-space($content_text)"/>
+    </xsl:variable>
+
+    <xsl:if test="$content_norm != '' and $content_norm != '&#160;' and $content_norm != '_'">
+        <xsl:value-of select="'&lt;![CDATA['" disable-output-escaping="yes"/>
+        <xsl:apply-templates select="$content/*" mode="rich_text"/>
+        <xsl:value-of select="']]&gt;'" disable-output-escaping="yes"/>
+    </xsl:if>
+</xsl:template>
+
+<!-- Copy elements as is -->
+<xsl:template match="*" mode="rich_text">
+    <xsl:element name="{translate(name(), $ucase, $lcase)}">
+        <xsl:apply-templates select="@*" mode="rich_text"/>
+        <!--
+        <xsl:for-each select="attribute()">
+            <xsl:comment><xsl:value-of select="concat(name(), '=&quot;', .)"/></xsl:comment>
+        </xsl:for-each>
+        -->
+        <xsl:apply-templates mode="rich_text"/>
+    </xsl:element>
+</xsl:template>
+
+<!-- copy attributes as is -->
+<xsl:template match="@*" mode="rich_text">
+    <xsl:attribute name="{translate(name(), $ucase, $lcase)}">
+        <xsl:value-of select="."/>
+    </xsl:attribute>
+</xsl:template>
+
+<xsl:template match="@class" mode="rich_text">
+    <xsl:choose>
+    <xsl:when test="starts-with(., 'QF')"><!-- Omit class --></xsl:when>
+    <xsl:when test="starts-with(., 'Body')"><!-- Omit class --></xsl:when>
+    <xsl:when test="starts-with(., 'Normal')"><!-- Omit class --></xsl:when>
+    <xsl:when test="starts-with(., 'Cell')"><!-- Omit class --></xsl:when>
+    <xsl:when test="starts-with(., 'Question')"><!-- Omit class --></xsl:when>
+    <xsl:when test="starts-with(., 'Instructions')"><!-- Omit class --></xsl:when>
+    <xsl:otherwise>
+        <xsl:attribute name="class">
+            <xsl:value-of select="."/>
+        </xsl:attribute>
+    </xsl:otherwise>
+    </xsl:choose>
+</xsl:template>
+
+<xsl:template name="substring-after-last">
+    <xsl:param name="text_string"/>
+    <xsl:param name="delimiter_string"/>
+
+    <xsl:choose>
+    <xsl:when test="contains($text_string, $delimiter_string)">
+        <!-- get everything after the first delimiter -->
+        <xsl:variable name="text_remainder" select="substring-after($text_string, $delimiter_string)"/>
+
+        <xsl:choose>
+            <xsl:when test="contains($text_remainder, $delimiter_string)">
+                <xsl:value-of select="$delimiter_string"/>
+                <xsl:call-template name="substring-after-last">
+                    <!-- store anything left in another variable -->
+                    <xsl:with-param name="text_string" select="substring-after($text_string, $delimiter_string)"/>
+                    <xsl:with-param name="delimiter_string" select="$delimiter_string"/>
+                </xsl:call-template>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:value-of select="$text_remainder"/>
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:when>
+    <xsl:otherwise>
+        <xsl:value-of select="$text_string"/>
+    </xsl:otherwise>
+    </xsl:choose>
+</xsl:template>
+
+<!-- Images -->
+
+<!-- Handle images by replacing the @src attribute with a reference to the base64-encoded data in the file element -->
+<xsl:template match="img" mode="embedded">
+    <xsl:variable name="image_src_attr" select="@src"/>
+    <xsl:variable name="image_src_data" select="$imagesContainer/img[@title = $image_src_attr]/@src"/>
+    <xsl:variable name="image_data" select="substring-after($image_src_data, $image_encoding)"/>
+    <xsl:variable name="image_format" select="substring-before($image_src_data, concat(';', $image_encoding))"/>
+
+    <FILE>
+        <FILENAME><xsl:value-of select="$image_src_attr"/></FILENAME>
+        <FILEPATH>/</FILEPATH>
+        <!-- Get the data from the imagesContainer -->
+        <CONTENTS><xsl:value-of select="$image_data"/></CONTENTS>
+        <FILEAUTHOR><xsl:value-of select="$username"/></FILEAUTHOR>
+        <FILELICENSE>allrightsreserved</FILELICENSE>
+    </FILE>
+
+</xsl:template>
+
+<xsl:template match="img" mode="rich_text">
         <!-- Moodle 2 images have the data component moved to the file element -->
         <img>
             <xsl:variable name="image_format" select="substring-after(substring-before(@src, ';'), '/')"/>
             <xsl:attribute name="src">
-                <xsl:value-of select="concat('@@PLUGINFILE@@/mqimage_', generate-id(), '.', $image_format)"/>
+                <xsl:value-of select="concat('@@PLUGINFILE@@/', @src)"/>
             </xsl:attribute>
             <xsl:if test="@alt and normalize-space(@alt) != '' and normalize-space(@alt) != '&#160;'">
                 <xsl:attribute name="alt"><xsl:value-of select="@alt"/></xsl:attribute>
@@ -349,16 +454,6 @@
                 <xsl:attribute name="height"><xsl:value-of select="@height"/></xsl:attribute>
             </xsl:if>
         </img>
-</xsl:template>
-
-
-
-<xsl:template match="img" mode="moodle2pluginfile">
-    <xsl:variable name="image_format" select="substring-after(substring-before(@src, ';'), '/')"/>
-
-    <file name="{concat('mqimage_', generate-id(), '.', $image_format)}" encoding="base64">
-        <xsl:value-of select="substring-after(@src, 'base64,')"/>
-    </file>
 </xsl:template>
 
 <xsl:template name="copyAttributes">

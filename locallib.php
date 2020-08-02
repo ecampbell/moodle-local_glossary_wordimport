@@ -45,8 +45,24 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
     $imagesforzipping = array();
     $word2xml = new wordconverter();
     $word2xml->set_heading1styleOffset($heading1styleoffset);
+    // $word2xml->set_imagehandling('embedded'); // Images in a glossary are embedded.
     $xhtmlcontent = $word2xml->import($wordfilename, $imagesforzipping);
     $xhtmlcontent = $word2xml->body_only($xhtmlcontent);
+
+    // Convert the returned array of images, if any, into a string
+    $imagestring = "";
+    $trace = new html_progress_trace();
+    // $trace->output(var_dump($imagesforzipping));
+
+    foreach ($imagesforzipping as $imagename => $imagedata) {
+        $trace->output("<p>imagename = $imagename</p>");
+        $filetype = strtolower(pathinfo($imagename, PATHINFO_EXTENSION));
+        $base64data = base64_encode($imagedata);
+        $filedata = 'data:image/' . $filetype . ';base64,' . $base64data;
+        // Embed the image name and data into the HTML.
+        $imagestring .= '<img title="' . $imagename . '" src="' . $filedata . '"/>';
+    }
+
     if (!($tempxmlfilename = tempnam($CFG->tempdir, "w2x")) || (file_put_contents($tempxmlfilename, $xhtmlcontent)) == 0) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
     }
@@ -58,11 +74,13 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
         'moodle_language' => current_language(),
         'moodle_textdirection' => (right_to_left()) ? 'rtl' : 'ltr',
         'heading1stylelevel' => $heading1styleoffset,
-        // 'imagehandling' => $this->imagehandling, // Are images embedded or referenced.
+        // 'imagehandling' => 'referenced',
+        'username' => $USER->firstname . ' ' . $USER->lastname,
         'debug_flag' => '1'
     );
 
     $xmlcontainer = "<pass2Container>\n<glossary>" . $xhtmlcontent . "</glossary>\n" .
+        "<imagesContainer>\n" . $imagestring . "</imagesContainer>\n" .
         local_glossary_wordimport_get_text_labels() . "\n</pass2Container>";
     $glossaryxml = $word2xml->convert($xmlcontainer, $importstylesheet, $parameters);
     $glossaryxml = str_replace('<GLOSSARY xmlns="http://www.w3.org/1999/xhtml"', '<GLOSSARY', $glossaryxml);
