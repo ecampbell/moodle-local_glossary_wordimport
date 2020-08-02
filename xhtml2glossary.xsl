@@ -123,7 +123,7 @@
                     <xsl:comment>definition: <xsl:value-of select="../table[1]/thead/tr[1]/th[1]"/></xsl:comment>
                     -->
                     <xsl:call-template name="termConcept">
-                        <xsl:with-param name="table_root" select="../table[1]" />
+                        <xsl:with-param name="table_root" select="following-sibling::table" />
                         <xsl:with-param name="concept" select="." />
                     </xsl:call-template>
                 </xsl:for-each>
@@ -146,9 +146,9 @@
             <xsl:value-of select="$concept"/>
         </CONCEPT>
         <DEFINITION>
-            <!-- <xsl:value-of select="'&lt;![CDATA['" disable-output-escaping="yes"/> -->
-            <xsl:value-of select="$table_root/thead/tr[1]/th[1]/*"/>
-            <!-- <xsl:value-of select="']]>'" disable-output-escaping="yes"/> -->
+            <xsl:value-of select="'&lt;![CDATA['" disable-output-escaping="yes"/>
+            <xsl:copy-of select="$table_root/thead/tr[1]/th[1]/*"/>
+            <xsl:value-of select="']]>'" disable-output-escaping="yes"/>
         </DEFINITION>
 
         <!--
