@@ -45,17 +45,13 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
     $imagesforzipping = array();
     $word2xml = new wordconverter();
     $word2xml->set_heading1styleOffset($heading1styleoffset);
-    // $word2xml->set_imagehandling('embedded'); // Images in a glossary are embedded.
     $xhtmlcontent = $word2xml->import($wordfilename, $imagesforzipping);
     $xhtmlcontent = $word2xml->body_only($xhtmlcontent);
 
-    // Convert the returned array of images, if any, into a string
+    // Convert the returned array of images, if any, into a string.
     $imagestring = "";
-    $trace = new html_progress_trace();
-    // $trace->output(var_dump($imagesforzipping));
 
     foreach ($imagesforzipping as $imagename => $imagedata) {
-        $trace->output("<p>imagename = $imagename</p>");
         $filetype = strtolower(pathinfo($imagename, PATHINFO_EXTENSION));
         $base64data = base64_encode($imagedata);
         $filedata = 'data:image/' . $filetype . ';base64,' . $base64data;
@@ -74,7 +70,6 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
         'moodle_language' => current_language(),
         'moodle_textdirection' => (right_to_left()) ? 'rtl' : 'ltr',
         'heading1stylelevel' => $heading1styleoffset,
-        // 'imagehandling' => 'referenced',
         'username' => $USER->firstname . ' ' . $USER->lastname,
         'debug_flag' => '1'
     );
