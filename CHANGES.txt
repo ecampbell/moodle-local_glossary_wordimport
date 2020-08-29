@@ -1,8 +1,9 @@
 # Change log
 
 Date          Version   Comment
-2020/08/02    0.0.6     Support embedded images.
-2020/08/02    0.0.5     Support for structured narrative text in definitions.
-2020/08/01    0.0.4     Initial draft working version.
-2020/06/28    0.0.2     Links added to settings.
+2020/08/29    0.7.0     Fix PHP errors on export.
+2020/08/02    0.6.0     Support embedded images.
+2020/08/02    0.5.0     Support for structured narrative text in definitions.
+2020/08/01    0.4.0     Initial draft working version.
+2020/06/28    0.3.0     Links added to settings.
 2020/06/28    0.0.1     Initial draft version.

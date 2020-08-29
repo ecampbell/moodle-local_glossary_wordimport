@@ -53,8 +53,6 @@ if ($action == 'import') {
 $PAGE->set_url('/local/glossary_wordimport/index.php', array('id' => $id, 'action' => $action));
 $PAGE->set_title($glossary->name);
 $PAGE->set_heading($course->fullname);
-echo $OUTPUT->header();
-echo $OUTPUT->heading($glossary->name);
 
 // If exporting, just convert the glossary terms into Word.
 if ($action == 'export') {
@@ -64,6 +62,9 @@ if ($action == 'export') {
     send_file($glossarytext, $filename, 10, 0, true, array('filename' => $filename));
     die;
 }
+
+echo $OUTPUT->header();
+echo $OUTPUT->heading($glossary->name);
 
 // Set up the Word file upload form.
 $mform = new local_glossary_wordimport_form(null, array('id' => $id, 'action' => $action));

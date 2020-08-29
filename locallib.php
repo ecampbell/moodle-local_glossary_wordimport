@@ -37,7 +37,7 @@ use \booktool_wordimport\wordconverter;
  * @return array Array with 2 elements $importedentries and $rejectedentries
  */
 function local_glossary_wordimport_import(string $wordfilename, stdClass $glossary, context_module $context) {
-    global $CFG, $OUTPUT, $DB, $USER;
+    global $CFG, $DB, $USER;
 
     // Convert the Word file into Glossary XML
     $heading1styleoffset = 1; // Map "Heading 1" styles to <h1>.
