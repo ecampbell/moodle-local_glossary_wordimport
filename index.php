@@ -34,6 +34,8 @@ require_once($CFG->libdir . '/filelib.php');
 $id = required_param('id', PARAM_INT); // Course Module ID (this glossary).
 $action = optional_param('action', 'import', PARAM_TEXT);  // Import or export action.
 $cat = optional_param('cat', 0, PARAM_ALPHANUM); // Include term categories.
+$verbose = optional_param('verbose', false, PARAM_BOOL); // Chapter ID.
+$imageformat = optional_param('imageformat', 'embedded', PARAM_TEXT); // Chapter ID.
 
 // Security checks.
 list ($course, $cm) = get_course_and_cm_from_cmid($id, 'glossary');
