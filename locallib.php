@@ -39,7 +39,7 @@ use \booktool_wordimport\wordconverter;
 function local_glossary_wordimport_import(string $wordfilename, stdClass $glossary, context_module $context) {
     global $CFG, $DB, $USER;
 
-    // Convert the Word file into Glossary XML
+    // Convert the Word file into Glossary XML.
     $heading1styleoffset = 1; // Map "Heading 1" styles to <h1>.
     // Pass 1 - convert the Word file content into XHTML and an array of images.
     $imagesforzipping = array();
