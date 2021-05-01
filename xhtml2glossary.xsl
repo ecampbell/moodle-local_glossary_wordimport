@@ -80,6 +80,7 @@
 <xsl:variable name="definition_label" select="$moodle_labels/data[@name = 'glossary_definition']"/>
 <xsl:variable name="categories_label" select="$moodle_labels/data[@name = 'glossary_categories']"/>
 <xsl:variable name="keywords_label" select="$moodle_labels/data[@name = 'glossary_aliases']"/>
+<xsl:variable name="tags_label" select="$moodle_labels/data[@name = 'moodle_tags']"/>
 <xsl:variable name="entryusedynalink_label" select="$moodle_labels/data[@name = 'glossary_entryusedynalink']"/>
 <xsl:variable name="casesensitive_label" select="$moodle_labels/data[@name = 'glossary_casesensitive']"/>
 <xsl:variable name="fullmatch_label" select="$moodle_labels/data[@name = 'glossary_fullmatch']"/>
@@ -121,8 +122,8 @@
                     <xsl:comment>definition: <xsl:value-of select="../table[1]/thead/tr[1]/th[1]"/></xsl:comment>
                     -->
                     <xsl:call-template name="termConcept">
-                        <xsl:with-param name="table_root" select="following-sibling::table[1]" />
                         <xsl:with-param name="concept" select="." />
+                        <xsl:with-param name="table_root" select="following-sibling::table[1]" />
                     </xsl:call-template>
                 </xsl:for-each>
             </ENTRIES>
@@ -135,9 +136,12 @@
     <xsl:param name="concept"/>
     <xsl:param name="table_root"/>
 
-    <xsl:variable name="entryusedynalink_value" select="normalize-space(translate($table_root/thead/tr[starts-with(th[1], $entryusedynalink_label)]/th[2], $ucase, $lcase))"/>
-    <xsl:variable name="casesensitive_value" select="normalize-space(translate($table_root/thead/tr[starts-with(th[1], $casesensitive_label)]/th[position() = $flag_value_colnum], $ucase, $lcase))"/>
-    <xsl:variable name="fullmatch_value" select="normalize-space(translate($table_root/thead/tr[starts-with(th[1], $fullmatch_label)]/th[position() = $flag_value_colnum], $ucase, $lcase))"/>
+    <xsl:variable name="entryusedynalink_value" select="normalize-space(translate($table_root/thead/tr[starts-with(normalize-space(th[1]), $entryusedynalink_label)]/th[2], $ucase, $lcase))"/>
+    <xsl:variable name="casesensitive_value" select="normalize-space(translate($table_root/thead/tr[starts-with(normalize-space(th[1]), $casesensitive_label)]/th[position() = $flag_value_colnum], $ucase, $lcase))"/>
+    <xsl:variable name="fullmatch_value" select="normalize-space(translate($table_root/thead/tr[starts-with(normalize-space(th[1]), $fullmatch_label)]/th[position() = $flag_value_colnum], $ucase, $lcase))"/>
+    <xsl:variable name="keywords_value" select="$table_root/thead/tr[starts-with(normalize-space(th[1]), $keywords_label)]/th[2]/*"/>
+    <xsl:variable name="tags_value" select="$table_root/thead/tr[starts-with(normalize-space(th[1]), $tags_label)]/th[2]/*"/>
+    <xsl:variable name="categories_value" select="$table_root/thead/tr[starts-with(normalize-space(th[1]), $categories_label)]/th[2]/*"/>
     <!-- Any images included? -->
     <xsl:variable name="contains_image" select="count($table_root/thead/tr[1]/th[1]//img)"/>
 
@@ -158,51 +162,71 @@
         </DEFINITION>
 
         <!--
+        <xsl:comment>keywords_label = <xsl:value-of select="$keywords_label"/></xsl:comment>
+        <xsl:comment>tagss_label = <xsl:value-of select="$tags_label"/></xsl:comment>
         <xsl:comment>categories_label = <xsl:value-of select="$categories_label"/></xsl:comment>
         <xsl:comment>entryusedynalink_value = <xsl:value-of select="$entryusedynalink_value"/></xsl:comment>
         <xsl:comment>casesensitive_value = <xsl:value-of select="$casesensitive_value"/></xsl:comment>
         <xsl:comment>fullmatch_value = <xsl:value-of select="$fullmatch_value"/></xsl:comment>
         -->
         <FORMAT>1</FORMAT>
-        <USEDYNALINK><xsl:call-template name="convert_value_to_number"><xsl:with-param name="string_value" select="$entryusedynalink_value"/></xsl:call-template></USEDYNALINK>
-        <CASESENSITIVE><xsl:call-template name="convert_value_to_number"><xsl:with-param name="string_value" select="$casesensitive_value"/></xsl:call-template></CASESENSITIVE>
+        <USEDYNALINK>
+            <xsl:call-template name="convert_value_to_number">
+                <xsl:with-param name="string_value" select="$entryusedynalink_value"/>
+            </xsl:call-template>
+        </USEDYNALINK>
+        <CASESENSITIVE>
+            <xsl:call-template name="convert_value_to_number">
+                <xsl:with-param name="string_value" select="$casesensitive_value"/>
+            </xsl:call-template>
+        </CASESENSITIVE>
         <FULLMATCH><xsl:call-template name="convert_value_to_number"><xsl:with-param name="string_value" select="$fullmatch_value"/></xsl:call-template></FULLMATCH>
 
         <!-- Handle any keywords that are included - all in one cell, comma-separated -->
-        <xsl:variable name="keywords_row" select="$table_root/thead/tr[starts-with(th[1], $keywords_label)]/th[2]"/>
-        <!--
-        <xsl:comment>keywords_label = <xsl:value-of select="$keywords_label"/></xsl:comment>
-        <xsl:comment>keywords_row = <xsl:value-of select="$keywords_row"/></xsl:comment>
-        -->
-        <xsl:if test="normalize-space($keywords_row) != '' and normalize-space($keywords_row) != '&#160;' and normalize-space($keywords_row) != '_'">
+        <xsl:if test="normalize-space($keywords_value) != '' and normalize-space($keywords_value) != '&#160;' and normalize-space($keywords_value) != '_'">
             <ALIASES>
                 <xsl:choose>
-                <xsl:when test="contains($keywords_row, ',')">
-                    <ALIAS><NAME><xsl:value-of select="normalize-space(substring-before($keywords_row, ','))"/></NAME></ALIAS>
-                    <xsl:call-template name="handle_keywords_row">
-                        <xsl:with-param name="keywords_row" select="normalize-space(substring-after($keywords_row, ','))"/>
+                <xsl:when test="contains($keywords_value, ',')">
+                    <ALIAS><NAME><xsl:value-of select="normalize-space(substring-before($keywords_value, ','))"/></NAME></ALIAS>
+                    <xsl:call-template name="handle_keywords_value">
+                        <xsl:with-param name="keywords_value" select="normalize-space(substring-after($keywords_value, ','))"/>
                     </xsl:call-template>
                 </xsl:when>
                 <xsl:otherwise>
-                    <ALIAS><NAME><xsl:value-of select="normalize-space($keywords_row)"/></NAME></ALIAS>
+                    <ALIAS><NAME><xsl:value-of select="normalize-space($keywords_value)"/></NAME></ALIAS>
                 </xsl:otherwise>
                 </xsl:choose>
             </ALIASES>
         </xsl:if>
 
-        <!-- Handle any categories that are included - all in one cell, comma-separated -->
-        <xsl:variable name="categories_row" select="$table_root/thead/tr[starts-with(th[1], $categories_label)]/th[2]/*"/>
-        <xsl:if test="normalize-space($categories_row) != '' and normalize-space($categories_row) != '&#160;' and normalize-space($categories_row) != '_'">
-            <CATEGORIES>
+        <xsl:if test="normalize-space($tags_value) != '' and normalize-space($tags_value) != '&#160;' and normalize-space($tags_value) != '_'">
+            <TAGS>
                 <xsl:choose>
-                <xsl:when test="contains($categories_row, ',')">
-                    <CATEGORY><NAME><xsl:value-of select="normalize-space(substring-before($categories_row, ','))"/></NAME></CATEGORY>
-                    <xsl:call-template name="handle_categories_row">
-                        <xsl:with-param name="categories_row" select="normalize-space(substring-after($categories_row, ','))"/>
+                <xsl:when test="contains($tags_value, ',')">
+                    <TAG><xsl:value-of select="normalize-space(substring-before($tags_value, ','))"/></TAG>
+                    <xsl:call-template name="handle_tags_value">
+                        <xsl:with-param name="tags_value" select="normalize-space(substring-after($tags_value, ','))"/>
                     </xsl:call-template>
                 </xsl:when>
                 <xsl:otherwise>
-                    <CATEGORY><NAME><xsl:value-of select="normalize-space($categories_row)"/></NAME></CATEGORY>
+                    <TAG><xsl:value-of select="normalize-space($tags_value)"/></TAG>
+                </xsl:otherwise>
+                </xsl:choose>
+            </TAGS>
+        </xsl:if>
+
+        <!-- Handle any categories that are included - all in one cell, comma-separated -->
+        <xsl:if test="normalize-space($categories_value) != '' and normalize-space($categories_value) != '&#160;' and normalize-space($categories_value) != '_'">
+            <CATEGORIES>
+                <xsl:choose>
+                <xsl:when test="contains($categories_value, ',')">
+                    <CATEGORY><NAME><xsl:value-of select="normalize-space(substring-before($categories_value, ','))"/></NAME></CATEGORY>
+                    <xsl:call-template name="handle_categories_value">
+                        <xsl:with-param name="categories_value" select="normalize-space(substring-after($categories_value, ','))"/>
+                    </xsl:call-template>
+                </xsl:when>
+                <xsl:otherwise>
+                    <CATEGORY><NAME><xsl:value-of select="normalize-space($categories_value)"/></NAME></CATEGORY>
                 </xsl:otherwise>
                 </xsl:choose>
             </CATEGORIES>
@@ -218,38 +242,53 @@
     </ENTRY>
 </xsl:template>
 
-<xsl:template name="handle_categories_row">
-    <xsl:param name="categories_row"/>
+<xsl:template name="handle_categories_value">
+    <xsl:param name="categories_value"/>
 
     <xsl:choose>
-    <xsl:when test="contains($categories_row, ',')">
-        <CATEGORY><NAME><xsl:value-of select="normalize-space(substring-before($categories_row, ','))"/></NAME></CATEGORY>
-        <xsl:call-template name="handle_categories_row">
-            <xsl:with-param name="categories_row" select="normalize-space(substring-after($categories_row, ','))"/>
+    <xsl:when test="contains($categories_value, ',')">
+        <CATEGORY><NAME><xsl:value-of select="normalize-space(substring-before($categories_value, ','))"/></NAME></CATEGORY>
+        <xsl:call-template name="handle_categories_value">
+            <xsl:with-param name="categories_value" select="normalize-space(substring-after($categories_value, ','))"/>
         </xsl:call-template>
     </xsl:when>
     <xsl:otherwise>
-        <CATEGORY><NAME><xsl:value-of select="normalize-space($categories_row)"/></NAME></CATEGORY>
+        <CATEGORY><NAME><xsl:value-of select="normalize-space($categories_value)"/></NAME></CATEGORY>
     </xsl:otherwise>
     </xsl:choose>
 </xsl:template>
 
-<xsl:template name="handle_keywords_row">
-    <xsl:param name="keywords_row"/>
+<xsl:template name="handle_keywords_value">
+    <xsl:param name="keywords_value"/>
 
     <xsl:choose>
-    <xsl:when test="contains($keywords_row, ',')">
-        <ALIAS><NAME><xsl:value-of select="normalize-space(substring-before($keywords_row, ','))"/></NAME></ALIAS>
-        <xsl:call-template name="handle_keywords_row">
-            <xsl:with-param name="keywords_row" select="normalize-space(substring-after($keywords_row, ','))"/>
+    <xsl:when test="contains($keywords_value, ',')">
+        <ALIAS><NAME><xsl:value-of select="normalize-space(substring-before($keywords_value, ','))"/></NAME></ALIAS>
+        <xsl:call-template name="handle_keywords_value">
+            <xsl:with-param name="keywords_value" select="normalize-space(substring-after($keywords_value, ','))"/>
         </xsl:call-template>
     </xsl:when>
     <xsl:otherwise>
-        <ALIAS><NAME><xsl:value-of select="normalize-space($keywords_row)"/></NAME></ALIAS>
+        <ALIAS><NAME><xsl:value-of select="normalize-space($keywords_value)"/></NAME></ALIAS>
     </xsl:otherwise>
     </xsl:choose>
 </xsl:template>
 
+<xsl:template name="handle_tags_value">
+    <xsl:param name="tags_value"/>
+
+    <xsl:choose>
+    <xsl:when test="contains($tags_value, ',')">
+        <TAG><xsl:value-of select="normalize-space(substring-before($tags_value, ','))"/></TAG>
+        <xsl:call-template name="handle_tags_value">
+            <xsl:with-param name="tags_value" select="normalize-space(substring-after($tags_value, ','))"/>
+        </xsl:call-template>
+    </xsl:when>
+    <xsl:otherwise>
+        <TAG><xsl:value-of select="normalize-space($tags_value)"/></TAG>
+    </xsl:otherwise>
+    </xsl:choose>
+</xsl:template>
 
 <!-- This template converts 'Yes'/'No' and variants to 0/1 -->
 <xsl:template name="convert_value_to_number">

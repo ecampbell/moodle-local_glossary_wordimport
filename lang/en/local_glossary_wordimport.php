@@ -39,4 +39,3 @@ $string['wordexport'] = 'Export to Microsoft Word';
 $string['wordfilerequired'] = 'Microsoft Word file required';
 $string['wordimport'] = 'Import from Microsoft Word';
 $string['xsltunavailable'] = 'You need the XSLT library installed in PHP to save this Word file';
-

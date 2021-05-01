@@ -39,7 +39,7 @@ use \booktool_wordimport\wordconverter;
 function local_glossary_wordimport_import(string $wordfilename, stdClass $glossary, context_module $context) {
     global $CFG, $DB, $USER;
 
-    // Convert the Word file into Glossary XML
+    // Convert the Word file into Glossary XML.
     $heading1styleoffset = 1; // Map "Heading 1" styles to <h1>.
     // Pass 1 - convert the Word file content into XHTML and an array of images.
     $imagesforzipping = array();
@@ -67,11 +67,7 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
     // XSLT stylesheet and parameters to convert generic XHTML into Moodle Glossary XML.
     $importstylesheet = __DIR__ . DIRECTORY_SEPARATOR . "xhtml2glossary.xsl";
     $parameters = array (
-        'moodle_language' => current_language(),
-        'moodle_textdirection' => (right_to_left()) ? 'rtl' : 'ltr',
-        'heading1stylelevel' => $heading1styleoffset,
-        'username' => $USER->firstname . ' ' . $USER->lastname,
-        'debug_flag' => '1'
+        'heading1stylelevel' => $heading1styleoffset
     );
 
     $xmlcontainer = "<pass2Container>\n<glossary>" . $xhtmlcontent . "</glossary>\n" .
@@ -252,9 +248,10 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
  * Export HTML pages to a Word file
  *
  * @param stdClass $glossary Glossary to export
+ * @param string $exportformat Encoded or embedded images
  * @return string
  */
-function local_glossary_wordimport_export(stdClass $glossary) {
+function local_glossary_wordimport_export(stdClass $glossary, string $exportformat) {
     global $CFG;
 
     // Export the current glossary into Glossary XML, then into XHTML, and write to a Word file.
@@ -272,17 +269,6 @@ function local_glossary_wordimport_export(stdClass $glossary) {
     // Pass 1 - convert the Glossary XML into XHTML and an array of images.
     // Stylesheet to convert Moodle Glossary XML into generic XHTML.
     $exportstylesheet = __DIR__ . "/glossary2xhtml.xsl";
-    // Set parameters for XSLT transformation. Note that we cannot use $arguments though.
-    $parameters = array (
-        'moodle_language' => current_language(),
-        'moodle_textdirection' => (right_to_left()) ? 'rtl' : 'ltr',
-        'moodle_release' => $CFG->release,
-        'moodle_url' => $CFG->wwwroot . "/",
-        'moodle_module' => 'glossary',
-        'debug_flag' => '1',
-        'transformationfailed' => get_string('transformationfailed', 'local_glossary_wordimport', $exportstylesheet)
-    );
-
     // Assemble the glossary contents and localised labels to a single XML file for easier XSLT processing.
     $pass1input = "<pass1Container>\n" . $glossaryxml .  local_glossary_wordimport_get_text_labels() . "\n</pass1Container>";
 
@@ -300,7 +286,9 @@ function local_glossary_wordimport_export(stdClass $glossary) {
     // Assemble the glossary contents and localised labels to a single XML file for easier XSLT processing.
     $pass2input = "<html>\n" . $glossaryhtml .   "\n</html>";
     // Convert the XHTML string into a Word-compatible version, with images converted to Base64 data.
-    $glossaryword = $word2xml->export($pass2input, 'glossary');
+    $moodlelabels = local_glossary_wordimport_get_text_labels();
+
+    $glossaryword = $word2xml->export($pass2input, 'glossary', $moodlelabels, $exportformat);
     if (!($tempxmlfilename = tempnam($CFG->tempdir, "p2o")) || (file_put_contents($tempxmlfilename, $glossaryword) == 0)) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
     }

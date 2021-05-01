@@ -33,6 +33,7 @@ require_once($CFG->libdir . '/filelib.php');
 
 $id = required_param('id', PARAM_INT); // Course Module ID (this glossary).
 $action = optional_param('action', 'import', PARAM_TEXT);  // Import or export action.
+$exportformat = optional_param('imageformat', 'encoded', PARAM_TEXT);  // Image encoding format for export.
 $cat = optional_param('cat', 0, PARAM_ALPHANUM); // Include term categories.
 
 // Security checks.
@@ -57,7 +58,7 @@ $PAGE->set_heading($course->fullname);
 // If exporting, just convert the glossary terms into Word.
 if ($action == 'export') {
     // Export the current glossary into Glossary XML, then into XHTML, and write to a Word file.
-    $glossarytext = local_glossary_wordimport_export($glossary, $context);
+    $glossarytext = local_glossary_wordimport_export($glossary, $exportformat);
     $filename = clean_filename(strip_tags(format_string($glossary->name)) . '.doc');
     send_file($glossarytext, $filename, 10, 0, true, array('filename' => $filename));
     die;

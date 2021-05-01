@@ -1,6 +1,7 @@
 # Change log
 
 Date          Version   Comment
+2021/05/01    1.1.0     Fix import of keywords and tags.
 2021/04/03    1.0.0     Update to stable release, export images in Word 2020/365 compatible format.
 2020/08/29    0.7.0     Fix PHP errors on export.
 2020/08/02    0.6.0     Support embedded images.
