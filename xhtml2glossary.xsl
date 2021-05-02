@@ -22,13 +22,11 @@
  * @author Eoin Campbell
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later (5)
 -->
-<xsl:stylesheet exclude-result-prefixes="htm o w"
+<xsl:stylesheet
     xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-    xmlns:o="urn:schemas-microsoft-com:office:office"
-    xmlns:w="urn:schemas-microsoft-com:office:word"
-    xmlns:htm="http://www.w3.org/1999/xhtml"
     xmlns="http://www.w3.org/1999/xhtml"
-    version="1.0">
+    version="1.0"
+>
 
 <!-- Settings -->
 <xsl:output encoding="UTF-8" method="xml" indent="yes" />
@@ -38,29 +36,16 @@
 <xsl:param name="moodle_release"/>  <!-- The release number of the current Moodle server -->
 <xsl:param name="moodle_language"/>  <!-- The current language interface selected by the user -->
 <xsl:param name="username"/>  <!-- The current user -->
-<xsl:param name="moodle_labels_file_stub" select="'../htmltemplates/moodle/moodle_gloss'"/>
 
 <xsl:variable name="ucase" select="'ABCDEFGHIJKLMNOPQRSTUVWXYZ'" />
 <xsl:variable name="lcase" select="'abcdefghijklmnopqrstuvwxyz'" />
 <!-- Top Level Variables derived from input -->
-<xsl:variable name="metadata" select="//htm:html/htm:head"/>
-<xsl:variable name="courseID" select="$metadata/htm:meta[@name='moodleCourseID']/@content" />
+<xsl:variable name="metadata" select="//html/head"/>
+<xsl:variable name="courseID" select="$metadata/meta[@name='moodleCourseID']/@content" />
 <!-- Get the Moodle version as a simple 2-digit number, e.g. 2.6.5 => 26 -->
 <xsl:variable name="moodleReleaseNumber" select="substring(translate($moodle_release, '.', ''), 1, 2)"/>
 <xsl:variable name="image_encoding" select="'base64,'"/>
     <xsl:variable name="imagesContainer" select="//imagesContainer"/>
-
-    <!-- Default column numbers-->
-    <xsl:variable name="nColumns" select="2"/>
-    <xsl:variable name="option_colnum" select="2"/>
-    <xsl:variable name="flag_value_colnum" select="2"/>
-    <xsl:variable name="specific_feedback_colnum" select="3"/>
-    <xsl:variable name="match_colnum" select="3"/>
-    <xsl:variable name="generic_feedback_colnum" select="2"/> <!-- 2 because the label cell is a th, not a td -->
-    <xsl:variable name="hints_colnum" select="2"/> <!-- 2 because the label cell is a th, not a td -->
-    <xsl:variable name="tags_colnum" select="2"/> <!-- 1 because the label cell is a th, not a td -->
-    <xsl:variable name="graderinfo_colnum" select="3"/>
-    <xsl:variable name="responsetemplate_colnum" select="2"/>
 
 <!-- Handle colon usage in French -->
 <xsl:variable name="colon_string">
@@ -136,14 +121,14 @@
     <xsl:param name="concept"/>
     <xsl:param name="table_root"/>
 
-    <xsl:variable name="entryusedynalink_value" select="normalize-space(translate($table_root/thead/tr[starts-with(normalize-space(th[1]), $entryusedynalink_label)]/th[2], $ucase, $lcase))"/>
-    <xsl:variable name="casesensitive_value" select="normalize-space(translate($table_root/thead/tr[starts-with(normalize-space(th[1]), $casesensitive_label)]/th[position() = $flag_value_colnum], $ucase, $lcase))"/>
-    <xsl:variable name="fullmatch_value" select="normalize-space(translate($table_root/thead/tr[starts-with(normalize-space(th[1]), $fullmatch_label)]/th[position() = $flag_value_colnum], $ucase, $lcase))"/>
-    <xsl:variable name="keywords_value" select="$table_root/thead/tr[starts-with(normalize-space(th[1]), $keywords_label)]/th[2]/*"/>
-    <xsl:variable name="tags_value" select="$table_root/thead/tr[starts-with(normalize-space(th[1]), $tags_label)]/th[2]/*"/>
-    <xsl:variable name="categories_value" select="$table_root/thead/tr[starts-with(normalize-space(th[1]), $categories_label)]/th[2]/*"/>
-    <!-- Any images included? -->
-    <xsl:variable name="contains_image" select="count($table_root/thead/tr[1]/th[1]//img)"/>
+    <xsl:variable name="entryusedynalink_value" select="normalize-space(translate($table_root/tbody/tr[starts-with(normalize-space(child::*[1]), $entryusedynalink_label)]/child::*[2], $ucase, $lcase))"/>
+    <xsl:variable name="casesensitive_value" select="normalize-space(translate($table_root/tbody/tr[starts-with(normalize-space(child::*[1]), $casesensitive_label)]/child::*[2], $ucase, $lcase))"/>
+    <xsl:variable name="fullmatch_value" select="normalize-space(translate($table_root/tbody/tr[starts-with(normalize-space(child::*[1]), $fullmatch_label)]/child::*[2], $ucase, $lcase))"/>
+    <xsl:variable name="keywords_value" select="$table_root/tbody/tr[starts-with(normalize-space(child::*[1]), $keywords_label)]/child::*[2]/*"/>
+    <xsl:variable name="tags_value" select="$table_root/tbody/tr[starts-with(normalize-space(child::*[1]), $tags_label)]/child::*[2]/*"/>
+    <xsl:variable name="categories_value" select="$table_root/tbody/tr[starts-with(normalize-space(child::*[1]), $categories_label)]/child::*[2]/*"/>
+    <!-- Any images included in the definition? -->
+    <xsl:variable name="contains_image" select="count($table_root/thead/tr[1]/child::*[1]//img)"/>
 
     <ENTRY>
         <CONCEPT>
@@ -152,7 +137,7 @@
         <DEFINITION>
 
             <xsl:call-template name="rich_text_content">
-                <xsl:with-param name="content" select="$table_root/thead/tr[1]/th[1]"/>
+                <xsl:with-param name="content" select="$table_root/thead/tr[1]/child::*[1]"/>
             </xsl:call-template>
 <!--
             <xsl:value-of select="'&lt;![CDATA['" disable-output-escaping="yes"/>
@@ -162,13 +147,13 @@
         </DEFINITION>
 
         <!--
+        -->
         <xsl:comment>keywords_label = <xsl:value-of select="$keywords_label"/></xsl:comment>
         <xsl:comment>tagss_label = <xsl:value-of select="$tags_label"/></xsl:comment>
         <xsl:comment>categories_label = <xsl:value-of select="$categories_label"/></xsl:comment>
         <xsl:comment>entryusedynalink_value = <xsl:value-of select="$entryusedynalink_value"/></xsl:comment>
         <xsl:comment>casesensitive_value = <xsl:value-of select="$casesensitive_value"/></xsl:comment>
         <xsl:comment>fullmatch_value = <xsl:value-of select="$fullmatch_value"/></xsl:comment>
-        -->
         <FORMAT>1</FORMAT>
         <USEDYNALINK>
             <xsl:call-template name="convert_value_to_number">
@@ -235,7 +220,7 @@
     <!-- Process any images -->
     <xsl:if test="$contains_image != 0">
         <ENTRYFILES>
-            <xsl:apply-templates select="$table_root/thead/tr[1]/th[1]//img" mode="embedded"/>
+            <xsl:apply-templates select="$table_root/thead/tr[1]/child::*[1]//img" mode="embedded"/>
         </ENTRYFILES>
     </xsl:if>
 

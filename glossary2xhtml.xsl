@@ -102,7 +102,7 @@
 <!-- Throw away extra wrapper elements included in container XML -->
 <xsl:template match="/pass1Container/moodlelabels"/>
 
-<xsl:template match="ENTRY"/>
+<xsl:template match="ENTRY">
     <!-- Loop through each Glossary entry -->
     <div>
         <h1 class="MsoHeading1"><xsl:value-of select="CONCEPT"/></h1>
@@ -139,7 +139,7 @@
                 <td style="{$col2_width}"><p class="Cell"><xsl:apply-templates select="TEACHERENTRY"/></p></td>
             </tr>
             <tr>
-                <td style="{$col1_width}"><xsl:value-of select="$tags_label"/></td>
+                <td style="{$col1_width}"><p class="TableRowHead"><xsl:value-of select="$tags_label"/></p></td>
                 <td style="{$col2_width}"><p class="Cell"><xsl:apply-templates select="TAGS"/></p></td>
             </tr>
             <!-- Instructions row -->
