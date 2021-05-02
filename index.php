@@ -34,9 +34,6 @@ require_once($CFG->libdir . '/filelib.php');
 $id = required_param('id', PARAM_INT); // Course Module ID (this glossary).
 $action = optional_param('action', 'import', PARAM_TEXT);  // Import or export action.
 $exportformat = optional_param('imageformat', 'encoded', PARAM_TEXT);  // Image encoding format for export.
-$cat = optional_param('cat', 0, PARAM_ALPHANUM); // Include term categories.
-$verbose = optional_param('verbose', false, PARAM_BOOL); // Chapter ID.
-$imageformat = optional_param('imageformat', 'embedded', PARAM_TEXT); // Chapter ID.
 
 // Security checks.
 list ($course, $cm) = get_course_and_cm_from_cmid($id, 'glossary');
@@ -96,7 +93,8 @@ if (!$data) { // Display the form.
     }
 
     // Convert the Word file content and import it into the glossary.
-    list ($importedentries, $entriesrejected) = local_glossary_wordimport_import($tmpfilename, $glossary, $context);
+    $includecategories = (!empty($data->catsincl)) ? true : false;
+    list ($importedentries, $entriesrejected) = local_glossary_wordimport_import($tmpfilename, $glossary, $context, $includecategories);
     if ($importedentries == -1 && $entriesrejected == -1) {
         echo $OUTPUT->box_start('glossarydisplay generalbox');
         echo get_string('errorparsingxml', 'glossary');

@@ -34,9 +34,10 @@ use \booktool_wordimport\wordconverter;
  * @param string $wordfilename Word file to be processed into XML
  * @param stdClass $glossary Glossary to import into
  * @param context_module $context Current course context
+ * @param bool $includecategories Import categories
  * @return array Array with 2 elements $importedentries and $rejectedentries
  */
-function local_glossary_wordimport_import(string $wordfilename, stdClass $glossary, context_module $context) {
+function local_glossary_wordimport_import(string $wordfilename, stdClass $glossary, context_module $context, bool $includecategories) {
     global $CFG, $DB, $USER;
 
     // Convert the Word file into Glossary XML.
@@ -166,7 +167,7 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
                     }
                 }
 
-                if (!empty($data->catsincl)) {
+                if ($includecategories) {
                     // If the categories must be imported...
                     $xmlcats = @$xmlentry['#']['CATEGORIES'][0]['#']['CATEGORY']; // Ignore missing CATEGORIES.
                     $sizeofxmlcats = is_array($xmlcats) ? count($xmlcats) : 0;
@@ -259,16 +260,13 @@ function local_glossary_wordimport_export(stdClass $glossary, string $exportform
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
     }
     $glossaryxml = preg_replace('/<\?xml version="1.0" ([^>]*)>/', "", $glossaryxml);
+    $moodlelabels = local_glossary_wordimport_get_text_labels();
 
-    if (!($tempxmlfilename = tempnam($CFG->tempdir, "mdl")) ||
-        (file_put_contents($tempxmlfilename, local_glossary_wordimport_get_text_labels())) == 0) {
-        throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
-    }
     // Pass 1 - convert the Glossary XML into XHTML and an array of images.
     // Stylesheet to convert Moodle Glossary XML into generic XHTML.
     $exportstylesheet = __DIR__ . "/glossary2xhtml.xsl";
     // Assemble the glossary contents and localised labels to a single XML file for easier XSLT processing.
-    $pass1input = "<pass1Container>\n" . $glossaryxml .  local_glossary_wordimport_get_text_labels() . "\n</pass1Container>";
+    $pass1input = "<pass1Container>\n" . $glossaryxml . $moodlelabels . "\n</pass1Container>";
 
     if (!($tempxmlfilename = tempnam($CFG->tempdir, "p1i")) || (file_put_contents($tempxmlfilename, $pass1input) == 0)) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
@@ -283,10 +281,7 @@ function local_glossary_wordimport_export(stdClass $glossary, string $exportform
     }
     // Assemble the glossary contents and localised labels to a single XML file for easier XSLT processing.
     $pass2input = "<html>\n" . $glossaryhtml .   "\n</html>";
-    $moodlelabels = local_glossary_wordimport_get_text_labels();
     // Convert the XHTML string into a Word-compatible version, with images converted to Base64 data.
-    $moodlelabels = local_glossary_wordimport_get_text_labels();
-
     $glossaryword = $word2xml->export($pass2input, 'glossary_wordimport', $moodlelabels, $exportformat);
     if (!($tempxmlfilename = tempnam($CFG->tempdir, "p2o")) || (file_put_contents($tempxmlfilename, $glossaryword) == 0)) {
         throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
@@ -306,10 +301,14 @@ function local_glossary_wordimport_get_text_labels() {
 
     // Release-independent list of all strings required in the XSLT stylesheets for labels etc.
     $textstrings = array(
-        'glossary' => array('aliases', 'casesensitive', 'concept',  'categories', 'definition', 'entryusedynalink',
-            'fullmatch', 'linking', 'pluginname'),
-        'local_glossary_wordimport' => array('teacherentry'),
-        'moodle' => array('no', 'yes', 'tags'),
+        'glossary' => array('aliases', 'casesensitive', 'concept',  'categories', 'definition', 'displayformat',
+                        'displayformatcontinuous', 'displayformatdefault', 'displayformatdictionary',
+                        'displayformatencyclopedia', 'displayformatentrylist', 'displayformatfullwithauthor',
+                        'displayformatfullwithoutauthor',
+                        'entryusedynalink', 'fullmatch', 'glossarytype', 'linking',
+                        'mainglossary', 'pluginname', 'secondaryglossary'),
+        'local_glossary_wordimport' => array('wordinstructions_help', 'teacherentry'),
+        'moodle' => array('description', 'no', 'yes', 'tags'),
         );
 
     $expout = "<moodlelabels>\n";
