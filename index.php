@@ -94,7 +94,7 @@ if (!$data) { // Display the form.
 
     // Convert the Word file content and import it into the glossary.
     $includecategories = (!empty($data->catsincl)) ? true : false;
-    list ($importedentries, $entriesrejected) = local_glossary_wordimport_import($tmpfilename, $glossary, $context, $includecategories);
+    list ($importedentries, $entriesrejected, $importedcats) = local_glossary_wordimport_import($tmpfilename, $glossary, $context, $includecategories);
     if ($importedentries == -1 && $entriesrejected == -1) {
         echo $OUTPUT->box_start('glossarydisplay generalbox');
         echo get_string('errorparsingxml', 'glossary');
@@ -123,6 +123,16 @@ if (!$data) { // Display the form.
         }
         echo '</td>';
         echo '</tr>';
+        if ($includecategories) {
+            echo '<tr>';
+            echo '<td width="50%" align="right">';
+            echo get_string("importedcategories","glossary");
+            echo ':</td>';
+            echo '<td width="50%">';
+            echo $importedcats;
+            echo '</td>';
+            echo '</tr>';
+        }
         echo '</table><hr />';
 
         echo $OUTPUT->continue_button(new moodle_url('/mod/glossary/view.php', array('id' => $id)));

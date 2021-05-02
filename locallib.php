@@ -234,13 +234,11 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
         // Reset caches.
         \mod_glossary\local\concept_cache::reset_glossary($glossary);
         // Return the number of imported and rejected entries.
-        return array($importedentries, $entriesrejected);
-
+        return array($importedentries, $entriesrejected, $importedcats);
     } else {
         // Return special number to indicate parsing failure.
-        return array(-1, -1);
+        return array(-1, -1, -1);
     }
-
 }
 
 /**
