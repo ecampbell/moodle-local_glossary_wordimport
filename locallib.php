@@ -62,10 +62,6 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
         $imagestring .= '<img title="' . $imagename . '" src="' . $filedata . '"/>';
     }
 
-    if (!($tempxmlfilename = tempnam($CFG->tempdir, "w2x")) || (file_put_contents($tempxmlfilename, $xhtmlcontent)) == 0) {
-        throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
-    }
-
     // Pass 2 - convert the initial XHTML into Moodle Glossary XML using localised table cell labels.
     // XSLT stylesheet to convert generic XHTML into Moodle Glossary XML.
     $importstylesheet = __DIR__ . DIRECTORY_SEPARATOR . "xhtml2glossary.xsl";
@@ -75,9 +71,6 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
         local_glossary_wordimport_get_text_labels() . "\n</pass2Container>";
     $glossaryxml = $word2xml->convert($xmlcontainer, $importstylesheet);
     $glossaryxml = str_replace('<GLOSSARY xmlns="http://www.w3.org/1999/xhtml"', '<GLOSSARY', $glossaryxml);
-    if (!($tempxmlfilename = tempnam($CFG->tempdir, "x2g")) || (file_put_contents($tempxmlfilename, $glossaryxml)) == 0) {
-        throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
-    }
 
     // Convert the Glossary XML into an internal structure for importing into database.
     // This code is copied from /mod/glossary/import.php line 187 onwards.
@@ -254,37 +247,23 @@ function local_glossary_wordimport_export(stdClass $glossary, string $exportform
 
     // Export the current glossary into Glossary XML, then into XHTML, and write to a Word file.
     $glossaryxml = glossary_generate_export_file($glossary, null, 0); // Include categories.
-    // Get a temporary file and store the XML content to transform.
-    if (!($tempxmlfilename = tempnam($CFG->tempdir, "gls")) || (file_put_contents($tempxmlfilename, $glossaryxml)) == 0) {
-        throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
-    }
     $glossaryxml = preg_replace('/<\?xml version="1.0" ([^>]*)>/', "", $glossaryxml);
     $moodlelabels = local_glossary_wordimport_get_text_labels();
 
     // Pass 1 - convert the Glossary XML into XHTML and an array of images.
     // Stylesheet to convert Moodle Glossary XML into generic XHTML.
     $exportstylesheet = __DIR__ . "/glossary2xhtml.xsl";
-    // Assemble the glossary contents and localised labels to a single XML file for easier XSLT processing.
+    // Assemble the glossary contents and localised labels to a single XML string for easier XSLT processing.
     $pass1input = "<pass1Container>\n" . $glossaryxml . $moodlelabels . "\n</pass1Container>";
 
-    if (!($tempxmlfilename = tempnam($CFG->tempdir, "p1i")) || (file_put_contents($tempxmlfilename, $pass1input) == 0)) {
-        throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
-    }
     $word2xml = new wordconverter('glossary_wordimport');
     $glossaryhtml = $word2xml->convert($pass1input, $exportstylesheet);
     $glossaryhtml = preg_replace('/<\?xml version="1.0" ([^>]*)>/', "", $glossaryhtml);
 
     // Pass 2 - convert XHTML into Word-compatible XHTML using localised table cell labels.
-    if (!($tempxmlfilename = tempnam($CFG->tempdir, "p1o")) || (file_put_contents($tempxmlfilename, $glossaryhtml) == 0)) {
-        throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
-    }
-    // Assemble the glossary contents and localised labels to a single XML file for easier XSLT processing.
     $pass2input = "<html>\n" . $glossaryhtml .   "\n</html>";
     // Convert the XHTML string into a Word-compatible version, with images converted to Base64 data.
     $glossaryword = $word2xml->export($pass2input, 'glossary_wordimport', $moodlelabels, $exportformat);
-    if (!($tempxmlfilename = tempnam($CFG->tempdir, "p2o")) || (file_put_contents($tempxmlfilename, $glossaryword) == 0)) {
-        throw new \moodle_exception(get_string('cannotopentempfile', 'local_glossary_wordimport', $tempxmlfilename));
-    }
     return $glossaryword;
 }
 
