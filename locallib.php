@@ -37,7 +37,8 @@ use \booktool_wordimport\wordconverter;
  * @param bool $includecategories Import categories
  * @return array Array with 2 elements $importedentries and $rejectedentries
  */
-function local_glossary_wordimport_import(string $wordfilename, stdClass $glossary, context_module $context, bool $includecategories) {
+function local_glossary_wordimport_import(string $wordfilename, stdClass $glossary, context_module $context,
+                            bool $includecategories) {
     global $CFG, $DB, $USER;
 
     // Convert the Word file into Glossary XML.
