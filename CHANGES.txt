@@ -1,6 +1,7 @@
 # Change log
 
 Date          Version   Comment
+2021/05/15    1.1.2     Fix import import error.
 2021/05/04    1.1.1     Stop saving temporary debugging files.
 2021/05/02    1.1.0     Fix import/export of categories, keywords and tags.
 2021/04/09    1.0.1     Update code for latest Book plugin methods interface.
