@@ -104,7 +104,7 @@
 
 <xsl:template match="ENTRY">
     <!-- Loop through each Glossary entry -->
-    <div>
+    <div class="chapter">
         <h1 class="MsoHeading1"><xsl:value-of select="CONCEPT"/></h1>
         <table border="1" dir="{$moodle_textdirection}" class="m2w_metatable">
         <thead>
@@ -149,8 +149,13 @@
             </tr>
         </tbody>
         </table>
+        <xsl:apply-templates select="ENTRYFILES"/>
         <p class="MsoBodyText"><xsl:value-of select="$blank_cell"/></p>
     </div>
+</xsl:template>
+
+<xsl:template match="NAME">
+    <xsl:value-of select="."/>
 </xsl:template>
 
 <xsl:template match="DISPLAYFORMAT">
@@ -160,7 +165,6 @@
 
     <p class="MsoBodyText"><b><xsl:value-of select="$displayformat_label"/></b><xsl:text> </xsl:text><xsl:value-of select="$displayformat_value"/></p>
 </xsl:template>
-
 
 <!-- Handle definition elements, which may consist only of a CDATA section -->
 <xsl:template match="DEFINITION|INTRO">
@@ -271,26 +275,17 @@
 </xsl:template>
 
 <!-- Handle images associated with '@@PLUGINFILE@@' keyword by including them in temporary supplementary paragraphs in whatever component they occur in -->
-<xsl:template match="FILE">
-    <xsl:param name="image_id"/>
-
-    <xsl:variable name="image_file_suffix">
-        <xsl:value-of select="translate(substring-after(@name, '.'), $ucase, $lcase)"/>
-    </xsl:variable>
-    <xsl:variable name="image_format">
-        <xsl:value-of select="concat('data:image/', $image_file_suffix, ';', @encoding, ',')"/>
-    </xsl:variable>
-    <xsl:variable name="alt_text">
-        <xsl:value-of select="concat('data:image/', $image_file_suffix, ';', @encoding, ',')"/>
-    </xsl:variable>
-
+<xsl:template match="ENTRYFILES">
     <div class="ImageFile">
-        <img title="{@name}" src="{concat($image_format, .)}">
-            <xsl:if test="$image_id != ''">
-                <xsl:attribute name="id"><xsl:value-of select="$image_id"/></xsl:attribute>
-            </xsl:if>
-        </img>
+        <xsl:apply-templates select="FILE"/>
     </div>
+</xsl:template>
+
+<xsl:template match="FILE">
+    <xsl:variable name="image_file_suffix" select="translate(substring-after(FILENAME, '.'), $ucase, $lcase)"/>
+    <xsl:variable name="image_format" select="concat('data:image/', $image_file_suffix, ';base64,')"/>
+
+    <img title="{FILENAME}" src="{concat($image_format, CONTENTS)}"/>
 </xsl:template>
 
 <!-- got to preserve comments for style definitions -->

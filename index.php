@@ -33,7 +33,7 @@ require_once($CFG->libdir . '/filelib.php');
 
 $id = required_param('id', PARAM_INT); // Course Module ID (this glossary).
 $action = optional_param('action', 'import', PARAM_TEXT);  // Import or export action.
-$exportformat = optional_param('imageformat', 'encoded', PARAM_TEXT);  // Image encoding format for export.
+$exportformat = optional_param('imageformat', 'embedded', PARAM_TEXT);  // Image encoding format for export.
 
 // Security checks.
 list ($course, $cm) = get_course_and_cm_from_cmid($id, 'glossary');
