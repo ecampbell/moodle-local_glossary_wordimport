@@ -47,7 +47,6 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
     $imagesforzipping = array();
     $word2xml = new wordconverter('glossary_wordimport');
     $word2xml->set_heading1styleOffset($heading1styleoffset);
-    // $word2xml->set_imagehandling('embedded');
     $xhtmlcontent = $word2xml->import($wordfilename, $imagesforzipping);
     $xhtmlcontent = $word2xml->body_only($xhtmlcontent);
 
