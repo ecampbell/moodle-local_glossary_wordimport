@@ -443,31 +443,21 @@
 
 <!-- Images -->
 
-<!-- Handle images by replacing the @src attribute with a reference to the base64-encoded data in the file element -->
+<!-- Add images as base64-encoded data in the ENTRYFILES container -->
 <xsl:template match="img" mode="embedded">
-    <xsl:variable name="image_src_attr" select="@src"/>
-    <xsl:variable name="image_src_data" select="$imagesContainer/img[@title = $image_src_attr]/@src"/>
-    <xsl:variable name="image_data" select="substring-after($image_src_data, $image_encoding)"/>
-    <xsl:variable name="image_format" select="substring-before($image_src_data, concat(';', $image_encoding))"/>
-
     <FILE>
-        <FILENAME><xsl:value-of select="$image_src_attr"/></FILENAME>
+        <FILENAME><xsl:value-of select="@name"/></FILENAME>
         <FILEPATH>/</FILEPATH>
-        <!-- Get the data from the imagesContainer -->
-        <CONTENTS><xsl:value-of select="$image_data"/></CONTENTS>
+        <CONTENTS><xsl:value-of select="@src"/></CONTENTS>
         <FILEAUTHOR><xsl:value-of select="$username"/></FILEAUTHOR>
         <FILELICENSE>allrightsreserved</FILELICENSE>
     </FILE>
-
 </xsl:template>
 
+<!-- Replace the base64-encoded image data with the name, to reference against the ENTRYFILES/FILE elements -->
 <xsl:template match="img" mode="rich_text">
         <!-- Moodle 2 images have the data component moved to the file element -->
-        <img>
-            <xsl:variable name="image_format" select="substring-after(substring-before(@src, ';'), '/')"/>
-            <xsl:attribute name="src">
-                <xsl:value-of select="concat('@@PLUGINFILE@@/', @src)"/>
-            </xsl:attribute>
+        <img src="{concat('@@PLUGINFILE@@/', @name)}">
             <xsl:if test="@alt and normalize-space(@alt) != '' and normalize-space(@alt) != '&#160;'">
                 <xsl:attribute name="alt"><xsl:value-of select="@alt"/></xsl:attribute>
             </xsl:if>

@@ -26,6 +26,7 @@ defined('MOODLE_INTERNAL') || die;
 
 require_once($CFG->dirroot . '/mod/glossary/lib.php');
 
+use moodle_exception;
 use \booktool_wordimport\wordconverter;
 
 /**
@@ -41,18 +42,22 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
                             bool $includecategories) {
     global $CFG, $DB, $USER;
 
-    // Convert the Word file into Glossary XML.
-    $heading1styleoffset = 1; // Map "Heading 1" styles to <h1>.
+    /** @var array Overrides to default XSLT parameters used for conversion */
+    $xsltparameters = array('pluginname' => 'local_glossary_wordimport',
+            'heading1stylelevel' => 1, // Map "Heading 1" style to <h1> element.
+            'imagehandling' => 'embedded' // Embed image data directly into the generated Moodle Glossary XML.
+        );
+
     // Pass 1 - convert the Word file content into XHTML and an array of images.
     $imagesforzipping = array();
-    $word2xml = new wordconverter('glossary_wordimport');
-    $word2xml->set_heading1styleOffset($heading1styleoffset);
+    $word2xml = new wordconverter($xsltparameters['pluginname']);
+    $word2xml->set_heading1styleoffset($xsltparameters['heading1stylelevel']);
+    $word2xml->set_imagehandling($xsltparameters['imagehandling']);
     $xhtmlcontent = $word2xml->import($wordfilename, $imagesforzipping);
     $xhtmlcontent = $word2xml->body_only($xhtmlcontent);
 
     // Convert the returned array of images, if any, into a string.
     $imagestring = "";
-
     foreach ($imagesforzipping as $imagename => $imagedata) {
         $filetype = strtolower(pathinfo($imagename, PATHINFO_EXTENSION));
         $base64data = base64_encode($imagedata);
@@ -68,8 +73,9 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
     $xmlcontainer = "<pass2Container>\n<glossary>" . $xhtmlcontent . "</glossary>\n" .
         "<imagesContainer>\n" . $imagestring . "</imagesContainer>\n" .
         local_glossary_wordimport_get_text_labels() . "\n</pass2Container>";
-    $glossaryxml = $word2xml->convert($xmlcontainer, $importstylesheet);
+    $glossaryxml = $word2xml->convert($xmlcontainer, $importstylesheet, $xsltparameters);
     $glossaryxml = str_replace('<GLOSSARY xmlns="http://www.w3.org/1999/xhtml"', '<GLOSSARY', $glossaryxml);
+    $word2xml->debug_write($glossaryxml, "glx");
 
     // Convert the Glossary XML into an internal structure for importing into database.
     // This code is copied from /mod/glossary/import.php line 187 onwards.
@@ -89,7 +95,7 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
             $newentry->concept = trim($xmlentry['#']['CONCEPT'][0]['#']);
             $definition = $xmlentry['#']['DEFINITION'][0]['#'];
             if (!is_string($definition)) {
-                print_error('errorparsingxml', 'glossary');
+                throw new \moodle_exception(get_string('errorparsingxml', 'glossary'));
             }
             $newentry->definition = trusttext_strip($definition);
             if (isset($xmlentry['#']['CASESENSITIVE'][0]['#'])) {
@@ -255,7 +261,7 @@ function local_glossary_wordimport_export(stdClass $glossary, string $exportform
     // Assemble the glossary contents and localised labels to a single XML string for easier XSLT processing.
     $pass1input = "<pass1Container>\n" . $glossaryxml . $moodlelabels . "\n</pass1Container>";
 
-    $word2xml = new wordconverter('glossary_wordimport');
+    $word2xml = new wordconverter('local_glossary_wordimport');
     $glossaryhtml = $word2xml->convert($pass1input, $exportstylesheet);
     $glossaryhtml = preg_replace('/<\?xml version="1.0" ([^>]*)>/', "", $glossaryhtml);
 
