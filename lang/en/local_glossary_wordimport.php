@@ -26,6 +26,8 @@ defined('MOODLE_INTERNAL') || die();
 
 
 $string['cannotopentempfile'] = 'Cannot open temporary file <b>{$a}</b>';
+$string['convertgifs'] = 'Convert GIF images to PNG.';
+$string['convertgifs_help'] = 'Converting GIF images enables the glossary to be exported back into Word for round-trip editing.';
 $string['filetoimport'] = 'File to import.';
 $string['filetoimport_help'] = 'Upload <i>.docx</i> file saved from Microsoft Word or LibreOffice';
 $string['pluginname'] = 'Microsoft Word file Import/Export (Glossary)';

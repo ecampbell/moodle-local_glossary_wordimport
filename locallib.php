@@ -36,10 +36,11 @@ use \booktool_wordimport\wordconverter;
  * @param stdClass $glossary Glossary to import into
  * @param context_module $context Current course context
  * @param bool $includecategories Import categories
+ * @param bool $convertgifs Convert GIF images to PNG
  * @return array Array with 2 elements $importedentries and $rejectedentries
  */
 function local_glossary_wordimport_import(string $wordfilename, stdClass $glossary, context_module $context,
-                            bool $includecategories) {
+                            bool $includecategories, bool $convertgifs) {
     global $CFG, $DB, $USER;
 
     /** @var array Overrides to default XSLT parameters used for conversion */
@@ -53,7 +54,7 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
     $word2xml = new wordconverter($xsltparameters['pluginname']);
     $word2xml->set_heading1styleoffset($xsltparameters['heading1stylelevel']);
     $word2xml->set_imagehandling($xsltparameters['imagehandling']);
-    $xhtmlcontent = $word2xml->import($wordfilename, $imagesforzipping);
+    $xhtmlcontent = $word2xml->import($wordfilename, $imagesforzipping, $convertgifs);
     $xhtmlcontent = $word2xml->body_only($xhtmlcontent);
 
     // Convert the returned array of images, if any, into a string.
@@ -75,7 +76,7 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
         local_glossary_wordimport_get_text_labels() . "\n</pass2Container>";
     $glossaryxml = $word2xml->convert($xmlcontainer, $importstylesheet, $xsltparameters);
     $glossaryxml = str_replace('<GLOSSARY xmlns="http://www.w3.org/1999/xhtml"', '<GLOSSARY', $glossaryxml);
-    $word2xml->debug_write($glossaryxml, "glx");
+    // Could use debug_write here for debugging.
 
     // Convert the Glossary XML into an internal structure for importing into database.
     // This code is copied from /mod/glossary/import.php line 187 onwards.

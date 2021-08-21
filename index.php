@@ -94,8 +94,9 @@ if (!$data) { // Display the form.
 
     // Convert the Word file content and import it into the glossary.
     $includecategories = (!empty($data->catsincl)) ? true : false;
+    $convertgifs = (!empty($data->convertgifs)) ? true : false;
     list ($importedentries, $entriesrejected, $importedcats) =
-        local_glossary_wordimport_import($tmpfilename, $glossary, $context, $includecategories);
+        local_glossary_wordimport_import($tmpfilename, $glossary, $context, $includecategories, $convertgifs);
     if ($importedentries == -1 && $entriesrejected == -1) {
         echo $OUTPUT->box_start('glossarydisplay generalbox');
         echo get_string('errorparsingxml', 'glossary');

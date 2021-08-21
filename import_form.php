@@ -57,6 +57,10 @@ class local_glossary_wordimport_form extends moodleform {
 
         $mform->addElement('checkbox', 'catsincl', get_string('importcategories', 'glossary'));
 
+        $mform->addElement('checkbox', 'convertgifs', get_string('convertgifs', 'local_glossary_wordimport'));
+        $mform->setDefault('convertgifs', 1);
+        $mform->addHelpButton('convertgifs', 'convertgifs', 'local_glossary_wordimport');
+
         $mform->addElement('hidden', 'id');
         $mform->setType('id', PARAM_INT);
 
