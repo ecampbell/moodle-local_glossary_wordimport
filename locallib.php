@@ -43,7 +43,7 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
                             bool $includecategories, bool $convertgifs) {
     global $CFG, $DB, $USER;
 
-    /** @var array Overrides to default XSLT parameters used for conversion */
+    // Overrides to default XSLT parameters used for conversion.
     $xsltparameters = array('pluginname' => 'local_glossary_wordimport',
             'heading1stylelevel' => 1, // Map "Heading 1" style to <h1> element.
             'imagehandling' => 'embedded' // Embed image data directly into the generated Moodle Glossary XML.
