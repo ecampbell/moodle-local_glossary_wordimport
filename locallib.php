@@ -55,7 +55,7 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
     $word2xml->set_heading1styleoffset($xsltparameters['heading1stylelevel']);
     $word2xml->set_imagehandling($xsltparameters['imagehandling']);
     $xhtmlcontent = $word2xml->import($wordfilename, $imagesforzipping, $convertgifs);
-    $xhtmlcontent = $word2xml->body_only($xhtmlcontent);
+    $xhtmlcontent = $word2xml->htmlbody($xhtmlcontent);
 
     // Convert the returned array of images, if any, into a string.
     $imagestring = "";
@@ -74,7 +74,7 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
     $xmlcontainer = "<pass2Container>\n<glossary>" . $xhtmlcontent . "</glossary>\n" .
         "<imagesContainer>\n" . $imagestring . "</imagesContainer>\n" .
         local_glossary_wordimport_get_text_labels() . "\n</pass2Container>";
-    $glossaryxml = $word2xml->convert($xmlcontainer, $importstylesheet, $xsltparameters);
+    $glossaryxml = $word2xml->xsltransform($xmlcontainer, $importstylesheet, $xsltparameters);
     $glossaryxml = str_replace('<GLOSSARY xmlns="http://www.w3.org/1999/xhtml"', '<GLOSSARY', $glossaryxml);
     // Could use debug_write here for debugging.
 
@@ -263,7 +263,7 @@ function local_glossary_wordimport_export(stdClass $glossary, string $exportform
     $pass1input = "<pass1Container>\n" . $glossaryxml . $moodlelabels . "\n</pass1Container>";
 
     $word2xml = new wordconverter('local_glossary_wordimport');
-    $glossaryhtml = $word2xml->convert($pass1input, $exportstylesheet);
+    $glossaryhtml = $word2xml->xsltransform($pass1input, $exportstylesheet);
     $glossaryhtml = preg_replace('/<\?xml version="1.0" ([^>]*)>/', "", $glossaryhtml);
 
     // Pass 2 - convert XHTML into Word-compatible XHTML using localised table cell labels.
