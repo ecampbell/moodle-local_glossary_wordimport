@@ -26,7 +26,6 @@ defined('MOODLE_INTERNAL') || die;
 
 require_once($CFG->dirroot . '/mod/glossary/lib.php');
 
-use moodle_exception;
 use \booktool_wordimport\wordconverter;
 
 /**
@@ -176,7 +175,11 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
 
                         $newcat = new stdClass();
                         $newcat->name = $xmlcat['#']['NAME'][0]['#'];
-                        $newcat->usedynalink = $xmlcat['#']['USEDYNALINK'][0]['#'];
+                        if ( isset($xmlcat['#']['USEDYNALINK'][0]['#']) ) {
+                            $newcat->usedynalink = $xmlcat['#']['USEDYNALINK'][0]['#'];
+                        } else {
+                            $newcat->usedynalink = $CFG->glossary_linkentries;
+                        }
                         if (!$category = $DB->get_record("glossary_categories",
                                 array("glossaryid" => $glossary->id, "name" => $newcat->name))) {
                             // Create the category if it does not exist.
