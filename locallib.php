@@ -26,7 +26,7 @@ defined('MOODLE_INTERNAL') || die;
 
 require_once($CFG->dirroot . '/mod/glossary/lib.php');
 
-use \booktool_wordimport\wordconverter;
+use booktool_wordimport\wordconverter;
 
 /**
  * Convert the Word file into Glossary XML and import it into the current glossary.
@@ -43,13 +43,13 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
     global $CFG, $DB, $USER;
 
     // Overrides to default XSLT parameters used for conversion.
-    $xsltparameters = array('pluginname' => 'local_glossary_wordimport',
+    $xsltparameters = ['pluginname' => 'local_glossary_wordimport',
             'heading1stylelevel' => 1, // Map "Heading 1" style to <h1> element.
-            'imagehandling' => 'embedded' // Embed image data directly into the generated Moodle Glossary XML.
-        );
+            'imagehandling' => 'embedded', // Embed image data directly into the generated Moodle Glossary XML.
+        ];
 
     // Pass 1 - convert the Word file content into XHTML and an array of images.
-    $imagesforzipping = array();
+    $imagesforzipping = [];
     $word2xml = new wordconverter($xsltparameters['pluginname']);
     $word2xml->set_heading1styleoffset($xsltparameters['heading1stylelevel']);
     $word2xml->set_imagehandling($xsltparameters['imagehandling']);
@@ -105,19 +105,19 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
             }
 
             $permissiongranted = 1;
-            if ($newentry->concept and $newentry->definition) {
+            if ($newentry->concept && $newentry->definition) {
                 if (!$glossary->allowduplicatedentries) {
                     // Checking if the entry is valid (checking if it is duplicated when should not be).
                     if ($newentry->casesensitive) {
                         $dupentry = $DB->record_exists_select('glossary_entries',
-                                        'glossaryid = :glossaryid AND concept = :concept', array(
+                                        'glossaryid = :glossaryid AND concept = :concept', [
                                             'glossaryid' => $glossary->id,
-                                            'concept'    => $newentry->concept));
+                                            'concept'    => $newentry->concept]);
                     } else {
                         $dupentry = $DB->record_exists_select('glossary_entries',
-                                        'glossaryid = :glossaryid AND LOWER(concept) = :concept', array(
+                                        'glossaryid = :glossaryid AND LOWER(concept) = :concept', [
                                             'glossaryid' => $glossary->id,
-                                            'concept'    => core_text::strtolower($newentry->concept)));
+                                            'concept'    => core_text::strtolower($newentry->concept)]);
                     }
                     if ($dupentry) {
                         $permissiongranted = 0;
@@ -181,7 +181,7 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
                             $newcat->usedynalink = $CFG->glossary_linkentries;
                         }
                         if (!$category = $DB->get_record("glossary_categories",
-                                array("glossaryid" => $glossary->id, "name" => $newcat->name))) {
+                                ["glossaryid" => $glossary->id, "name" => $newcat->name])) {
                             // Create the category if it does not exist.
                             $category = new stdClass();
                             $category->name = $newcat->name;
@@ -205,7 +205,7 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
                 // Import files attached to the entry.
                 if (glossary_xml_import_files($xmlentry['#'], 'ATTACHMENTFILES', $glossarycontext->id, 'attachment',
                         $newentry->id)) {
-                    $DB->update_record("glossary_entries", array('id' => $newentry->id, 'attachment' => '1'));
+                    $DB->update_record("glossary_entries", ['id' => $newentry->id, 'attachment' => '1']);
                 }
 
                 // Import tags associated with the entry.
@@ -223,7 +223,7 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
 
             } else {
                 $entriesrejected++;
-                if ($newentry->concept and $newentry->definition) {
+                if ($newentry->concept && $newentry->definition) {
                     // Add to exception report (duplicated entry)).
                     $rejections .= "<tr><td>$newentry->concept</td>" .
                                    "<td>" . get_string("duplicateentry", "glossary"). "</td></tr>";
@@ -237,10 +237,10 @@ function local_glossary_wordimport_import(string $wordfilename, stdClass $glossa
         // Reset caches.
         \mod_glossary\local\concept_cache::reset_glossary($glossary);
         // Return the number of imported and rejected entries.
-        return array($importedentries, $entriesrejected, $importedcats);
+        return [$importedentries, $entriesrejected, $importedcats];
     } else {
         // Return special number to indicate parsing failure.
-        return array(-1, -1, -1);
+        return [-1, -1, -1];
     }
 }
 
@@ -287,16 +287,17 @@ function local_glossary_wordimport_get_text_labels() {
     global $CFG;
 
     // Release-independent list of all strings required in the XSLT stylesheets for labels etc.
-    $textstrings = array(
-        'glossary' => array('aliases', 'casesensitive', 'concept',  'categories', 'definition', 'displayformat',
+    $textstrings = [
+        'glossary' => ['aliases', 'casesensitive', 'concept',  'categories', 'definition', 'displayformat',
                         'displayformatcontinuous', 'displayformatdefault', 'displayformatdictionary',
                         'displayformatencyclopedia', 'displayformatentrylist', 'displayformatfullwithauthor',
                         'displayformatfullwithoutauthor',
                         'entryusedynalink', 'fullmatch', 'glossarytype', 'linking',
-                        'mainglossary', 'pluginname', 'secondaryglossary'),
-        'local_glossary_wordimport' => array('wordinstructions_help', 'teacherentry'),
-        'moodle' => array('description', 'no', 'yes', 'tags'),
-        );
+                        'mainglossary', 'pluginname', 'secondaryglossary',
+                        ],
+        'local_glossary_wordimport' => ['wordinstructions_help', 'teacherentry'],
+        'moodle' => ['description', 'no', 'yes', 'tags'],
+        ];
 
     $expout = "<moodlelabels>\n";
     foreach ($textstrings as $typegroup => $grouparray) {

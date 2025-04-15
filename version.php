@@ -24,9 +24,9 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2021083100;              // The current plugin version (Date: YYYYMMDDXX).
-$plugin->requires = 2016052300;               // Requires Moodle 3.1 or higher.
+$plugin->version   = 2025041500;              // The current plugin version (Date: YYYYMMDDXX).
+$plugin->requires = 2025041400;               // Requires Moodle 5.0 or higher.
 $plugin->component = 'local_glossary_wordimport';   // Full name of the plugin (used for diagnostics).
 $plugin->maturity = MATURITY_STABLE;
-$plugin->release = '1.1.6 (Build: 2021083100)'; // Human readable version information.
-$plugin->dependencies = array('booktool_wordimport' => 2021083100); // Requires Book Word import plugin v1.4.10.
+$plugin->release = '1.1.7 (Build: 2025041500)'; // Human readable version information.
+$plugin->dependencies = ['booktool_wordimport' => 2025041501]; // Requires Book Word import plugin v1.4.13.

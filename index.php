@@ -37,7 +37,7 @@ $exportformat = optional_param('imageformat', 'embedded', PARAM_TEXT);  // Image
 
 // Security checks.
 list ($course, $cm) = get_course_and_cm_from_cmid($id, 'glossary');
-$glossary = $DB->get_record('glossary', array('id' => $cm->instance), '*', MUST_EXIST);
+$glossary = $DB->get_record('glossary', ['id' => $cm->instance], '*', MUST_EXIST);
 require_course_login($course, true, $cm);
 
 // Check import/export capabilities.
@@ -50,7 +50,7 @@ if ($action == 'import') {
 }
 
 // Set up page in case an import has been requested.
-$PAGE->set_url('/local/glossary_wordimport/index.php', array('id' => $id, 'action' => $action));
+$PAGE->set_url('/local/glossary_wordimport/index.php', ['id' => $id, 'action' => $action]);
 $PAGE->set_title($glossary->name);
 $PAGE->set_heading($course->fullname);
 
@@ -59,7 +59,7 @@ if ($action == 'export') {
     // Export the current glossary into Glossary XML, then into XHTML, and write to a Word file.
     $glossarytext = local_glossary_wordimport_export($glossary, $exportformat);
     $filename = clean_filename(strip_tags(format_string($glossary->name)) . '.doc');
-    send_file($glossarytext, $filename, 10, 0, true, array('filename' => $filename));
+    send_file($glossarytext, $filename, 10, 0, true, ['filename' => $filename]);
     die;
 }
 
@@ -67,7 +67,7 @@ echo $OUTPUT->header();
 echo $OUTPUT->heading($glossary->name);
 
 // Set up the Word file upload form.
-$mform = new local_glossary_wordimport_form(null, array('id' => $id, 'action' => $action));
+$mform = new local_glossary_wordimport_form(null, ['id' => $id, 'action' => $action]);
 if ($mform->is_cancelled()) {
     // Form cancelled, go back.
     redirect($CFG->wwwroot . "/mod/glossary/view.php?id=$cm->id");
@@ -100,7 +100,7 @@ if (!$data) { // Display the form.
     if ($importedentries == -1 && $entriesrejected == -1) {
         echo $OUTPUT->box_start('glossarydisplay generalbox');
         echo get_string('errorparsingxml', 'glossary');
-        echo $OUTPUT->continue_button(new moodle_url('/mod/glossary/view.php', array('id' => $id)));
+        echo $OUTPUT->continue_button(new moodle_url('/mod/glossary/view.php', ['id' => $id]));
         echo $OUTPUT->box_end();
     } else {
         // Print the number of processed entries.
@@ -137,7 +137,7 @@ if (!$data) { // Display the form.
         }
         echo '</table><hr />';
 
-        echo $OUTPUT->continue_button(new moodle_url('/mod/glossary/view.php', array('id' => $id)));
+        echo $OUTPUT->continue_button(new moodle_url('/mod/glossary/view.php', ['id' => $id]));
         echo $OUTPUT->box_end();
     }
 

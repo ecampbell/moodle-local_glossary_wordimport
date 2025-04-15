@@ -22,8 +22,6 @@
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Add import/export commands to the Glossary settings block
  *
@@ -48,16 +46,16 @@ function local_glossary_wordimport_extend_settings_navigation(settings_navigatio
 
     // Add the import link if the user has the capability.
     if (has_capability('mod/glossary:import', $context)) {
-        $url1 = new moodle_url('/local/glossary_wordimport/index.php', array('id' => $PAGE->cm->id, 'action' => 'import'));
+        $url1 = new moodle_url('/local/glossary_wordimport/index.php', ['id' => $PAGE->cm->id, 'action' => 'import']);
         $menu->add(get_string('wordimport', 'local_glossary_wordimport'), $url1, navigation_node::TYPE_SETTING, null, null,
-               new pix_icon('f/document', '', 'moodle', array('class' => 'iconsmall', 'title' => '')));
+               new pix_icon('f/document', '', 'moodle', ['class' => 'iconsmall', 'title' => '']));
     }
 
     // Add the export link if the user has the capability.
     if (has_capability('mod/glossary:export', $context)) {
-        $url2 = new moodle_url('/local/glossary_wordimport/index.php', array('id' => $PAGE->cm->id, 'action' => 'export'));
+        $url2 = new moodle_url('/local/glossary_wordimport/index.php', ['id' => $PAGE->cm->id, 'action' => 'export']);
         $menu->add(get_string('wordexport', 'local_glossary_wordimport'), $url2, navigation_node::TYPE_SETTING,
-           null, null, new pix_icon('f/document', '', 'moodle', array('class' => 'iconsmall', 'title' => '')));
+           null, null, new pix_icon('f/document', '', 'moodle', ['class' => 'iconsmall', 'title' => '']));
     }
 
 }
