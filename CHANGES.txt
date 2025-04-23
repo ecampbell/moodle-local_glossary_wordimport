@@ -1,6 +1,7 @@
 # Change log
 
 Date          Version   Comment
+2025/04/23    1.1.7     Fix code styling issues, support export of img/@alt attribute.
 2021/08/31    1.1.6     Update for Book tool Word import plugin compatibility.
 2021/08/21    1.1.5     Convert GIF images to PNG on import for Word compatibility on export.
 2021/07/14    1.1.4     Require latest version of Book Word import plugin.
